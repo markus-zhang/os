@@ -8,9 +8,9 @@
         "name": "(gdb) Launch",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceRoot}/wzip",
-        "args": ["wzip.txt"],
-        "cwd": "${workspaceRoot}",
+        "program": "${workspaceRoot}/utils/reverse",
+        "cwd": "${workspaceRoot}/utils",
+        "args": ["reverse.txt"],
         "MIMode": "gdb",
         "setupCommands": [
             {
@@ -23,7 +23,11 @@
                 "text": "-gdb-set disassembly-flavor intel",
                 "ignoreFailures": true
             }
-        ]
+        ],
+        // https://hkt999.medium.com/vscode-source-path-%E7%AD%86%E8%A8%98-788df7f04d6
+        "sourceFileMap": {
+            "/build/glibc-sMfBJT": "/usr/src/glibc"
+        }
     }
     ]
 }
