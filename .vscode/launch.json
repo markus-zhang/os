@@ -8,9 +8,9 @@
         "name": "(gdb) Launch",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceRoot}/utils/reverse",
-        "cwd": "${workspaceRoot}/utils",
-        "args": ["reverse.txt"],
+        "program": "${workspaceRoot}/process/pl1.c",
+        "cwd": "${workspaceRoot}/process",
+        "args": [],
         "MIMode": "gdb",
         "setupCommands": [
             {
