@@ -8,6 +8,8 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+// #define _DEFAULT_SOURCE
+#include <dirent.h> 
 
 /*
     TODO: Summarize the functionalities of MASH
@@ -83,7 +85,7 @@ int main(int argc, char* argv[]) {
         */
         process_command(input);
         
-        printf(">%s\n", input);
+        // printf(">%s\n", input);
     }
 
     // shut down
@@ -140,7 +142,8 @@ int32_t init_path() {
             }
             p[length] = '\0';
             path[count] = p;
-            printf("%s\n", p);
+            // TODO: convert next line to debugging
+            // printf("%s\n", p);
             count++;
             if (s[end] == '\0') {
                 break;
@@ -212,4 +215,21 @@ int32_t process_command(char* command) {
     /*
         TODO: Summarize the functionality of this function
     */
+    
+    // TODO: for now just implement the ls command
+    // Also need to move implementation to other functions
+    // process_command() should be the dispatcher, not runner
+    DIR* d;
+    struct dirent* dir;
+    d = opendir(".");
+    if (d) {
+        while ((dir = readdir(d)) != NULL) {
+            if (dir->d_type == DT_REG) {
+                printf("%s  ", dir->d_name);
+            }
+        }
+        printf("\n");
+        closedir(d);
+    }
+    return EXIT_SUCCESS;
 }
