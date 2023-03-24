@@ -1,32 +1,38 @@
 /*
     A minimum shell implementation for study of processes under Linux
+    gcc -std=gnu99 -Wall -Werror -pedantic mash.c -o mash
 */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#define __STDC_WANT_LIB_EXT1__ 1
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
 // #define _DEFAULT_SOURCE
-#include <dirent.h> 
+#include <dirent.h>
+#include "mashtool.h"
 
 /*
     TODO: Summarize the functionalities of MASH
 */
 
-#define DEBUG               true
-#define RUNNING             true
+#define DEBUG                   true
+#define RUNNING                 true
 // Allow 64 strings in path initially, add 16 each time if needed
-#define PATH_INITIAL_SIZE   64
-#define PATH_INCREMENT_SIZE 16
-#define CWD_LEN             256
+#define PATH_INITIAL_SIZE       64
+#define PATH_INCREMENT_SIZE     16
+#define CWD_LEN                 256
+#define ARGV_INITIAL_SIZE       64
+#define ARGV_INCREMENT_SIZE     16
 
 int32_t init_path();
 int32_t inspect_path();
 int32_t add_path(const char* newPath);
 int32_t remove_path(const char* oldPath);
 int32_t process_command(char* command);
+int32_t _internal_ls();
 
 /*
     Global variables
@@ -38,9 +44,10 @@ int32_t process_command(char* command);
         - type: int32_t
         - comment: changes for each remove/add operation
 */
-char* cwd;
-char** path;
-int32_t pathCount;
+char*       cwd;
+char**      path;
+int32_t     pathCount;
+char*       argv[ARGV_INITIAL_SIZE];
 
 int main(int argc, char* argv[]) {
     // Initiate CWD
@@ -58,18 +65,11 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "init_path() failed\n");
         return EXIT_FAILURE;
     }
-    /*
-    printf("init_path() successfully completed, %d paths loaded\n", pathCount);
-    if (remove_path("/usr/games", path, &pathCount) != EXIT_SUCCESS) {
-        printf("/usr/games not in path\n");
-    }
-    inspect_path(path, pathCount);
 
-    if (add_path("/usr/games", path, &pathCount) != EXIT_SUCCESS) {
-        printf("failed to add /usr/games, reached 64 paths\n");
+    // Initiate ARGV
+    for (int i = 0; i < ARGV_INITIAL_SIZE; i++) {
+        argv[i] = NULL;
     }
-    inspect_path(path, pathCount);
-    */
 
     while(RUNNING) {
         fprintf(stdout, ">");
@@ -84,8 +84,6 @@ int main(int argc, char* argv[]) {
                 - ls: list all files and directories under cwd
         */
         process_command(input);
-        
-        // printf(">%s\n", input);
     }
 
     // shut down
@@ -212,13 +210,28 @@ int32_t remove_path(const char* oldPath) {
 }
 
 int32_t process_command(char* command) {
+    if (strlen(command) == 0) {
+        return EXIT_SUCCESS;
+    }
+
+    // TODO: Tokenize command and put into argv[]
+    // TODO: Check if <= 64 tokens, if > then still parse but warn about lost data
+    if (count_char(command, ' '))
+    
+    if ((strncmp(command, "ls\n", 3) == 0) && (strlen(command) == 3)) {
+        return _internal_ls();
+    }
+    
+    return EXIT_SUCCESS;
+}
+
+int32_t _internal_ls() {
     /*
         TODO: Summarize the functionality of this function
+        https://stackoverflow.com/questions/4204666/how-to-list-files-in-a-directory-in-a-c-program
     */
     
-    // TODO: for now just implement the ls command
-    // Also need to move implementation to other functions
-    // process_command() should be the dispatcher, not runner
+    // TODO: implement some flags for ls
     DIR* d;
     struct dirent* dir;
     d = opendir(".");
@@ -236,12 +249,10 @@ int32_t process_command(char* command) {
         fileCount = 0;
         while ((dir = readdir(d)) != NULL) {
             if (dir->d_type == DT_REG) {
-                int len = strlen(dir->d_name);
+                int len = strlen(dir->d_name) + 1;
                 char* n = malloc(len + 1);
-                for (int i = 0; i < len; i++) {
-                    n[i] = (dir->d_name)[i];
-                }
-                n[len] = '\0';
+                strncpy(n, dir->d_name, len);
+
                 filename[fileCount] = n;
                 fileCount++;
             }
@@ -266,7 +277,7 @@ int32_t process_command(char* command) {
             printf("%s  ", filename[i]);
         }
         printf("\n");
-        // TODO: free strings in filename and then free filename
+        // Clean up
         for (int i = 0; i < fileCount; i++) {
             free(filename[i]);
         }
