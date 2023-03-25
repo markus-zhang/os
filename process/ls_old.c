@@ -28,7 +28,7 @@
 /* Written by Richard Stallman and David MacKenzie. */
 
 #ifdef _AIX
- #pragma alloca
+#pragma alloca
 #endif
 #include <sys/types.h>
 #if !defined(_POSIX_SOURCE) || defined(_AIX)
@@ -43,7 +43,11 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
+#include <stdlib.h>
+#include <errno.h>
+#include <dirent.h>
+#include <string.h>
+#include <sys/sysmacros.h>
 
 #ifndef S_IEXEC
 #define S_IEXEC S_IXUSR
@@ -62,6 +66,7 @@
 char *ctime ();
 time_t time ();
 #endif
+
 
 void mode_string ();
 
@@ -109,6 +114,9 @@ void print_with_commas ();
 void queue_directory ();
 void sort_files ();
 void usage ();
+// static long adjust_blocks (long, int, int);
+
+#define convert_blocks(b) adjust_blocks ((b), 1024, 512)
 
 enum filetype
 {
@@ -343,8 +351,7 @@ int format_needs_stat;
 
 int exit_status;
 
-void
-main (argc, argv)
+int main (argc, argv)
      int argc;
      char **argv;
 {
@@ -812,7 +819,8 @@ print_dir (name, realname)
      char *realname;
 {
   register DIR *reading;
-  register struct direct *next;
+  // register struct direct *next;
+  register struct dirent* next;
   register int total_blocks = 0;
 
   errno = 0;
@@ -829,11 +837,11 @@ print_dir (name, realname)
 
   clear_files ();
 
-  while (next = readdir (reading))
+  while ((next = readdir (reading)))
     if (file_interesting (next))
       total_blocks += gobble_file (next->d_name, 0, name);
 
-  if (CLOSEDIR (reading))
+  if (closedir(reading))
     {
       error (0, errno, "%s", name);
       exit_status = 1;
@@ -887,7 +895,8 @@ add_ignore_pattern (pattern)
 
 int
 file_interesting (next)
-     register struct direct *next;
+     // register struct direct *next;
+     register struct dirent* next;
 {
   register struct ignore_pattern *ignore;
 
@@ -937,7 +946,7 @@ gobble_file (name, explicit_arg, dirname)
      int explicit_arg;
      char *dirname;
 {
-  register int blocks;
+  // register int blocks;
   register int val;
   register char *path;
 
@@ -1006,7 +1015,7 @@ gobble_file (name, explicit_arg, dirname)
 	  char *linkpath;
 	  struct stat linkstats;
 
-	  get_link_name (path, &files[files_index]);
+	  get_link_name (path, &(files[files_index]));
 	  linkpath = make_link_path (path, files[files_index].linkname);
 
 	  if (linkpath && stat (linkpath, &linkstats) == 0)
@@ -1068,6 +1077,8 @@ gobble_file (name, explicit_arg, dirname)
 // https://github.com/wertarbyte/coreutils/commit/14fd34b78818660e05806b6eda178e3f846c5c21#diff-1a52694050e227431a5338b65ff88dda17a64fa5d4ea52fef2bc5090efe96069
 // #define convert_blocks(b) adjust_blocks ((b), 1024, 512)
 // FIXME: I don't quite get what it does, maybe it is to scale down struct size to save space?
+
+/*
       blocks = convert_blocks (ST_NBLOCKS (files[files_index].stat),
 			       kilobyte_blocks);
       if (blocks >= 10000 && block_size_size < 5)
@@ -1079,12 +1090,15 @@ gobble_file (name, explicit_arg, dirname)
     }
   else
     blocks = 0;
-
+    */
+    }
 // Initialize the name field of the file struct
   files[files_index].name = xstrdup (name);
 // Don't forget to move index as it's a global variable
   files_index++;
 
+  // return blocks;
+  int blocks = 5;
   return blocks;
 }
 
@@ -1093,36 +1107,30 @@ gobble_file (name, explicit_arg, dirname)
 /* Put the name of the file that `filename' is a symbolic link to
    into the `linkname' field of `f'. */
 
-void
-get_link_name (filename, f)
-     char *filename;
-     struct file *f;
-{
-  register char *linkbuf;
-#ifdef _AIX
-  register int bufsiz = PATH_MAX; /* st_size is wrong. */
-#else
-  register int bufsiz = f->stat.st_size;
-#endif
-  register int linksize;
+void get_link_name (char* filename, struct file* f) {
+    register char* linkbuf;
+    #ifdef _AIX
+    register int bufsiz = PATH_MAX; /* st_size is wrong. */
+    #else
+    register int bufsiz = f->stat.st_size;
+    #endif
+    register int linksize;
 
-  linkbuf = (char *) xmalloc (bufsiz + 1);
-  /* Some automounters give incorrect st_size for mount points.
-     I can't think of a good workaround for it, though.  */
-  linksize = readlink (filename, linkbuf, bufsiz);
-  if (linksize < 0)
-    {
-      error (0, errno, "%s", filename);
-      exit_status = 1;
-      free (linkbuf);
+    linkbuf = (char *) xmalloc (bufsiz + 1);
+    /* Some automounters give incorrect st_size for mount points.
+        I can't think of a good workaround for it, though.  */
+    linksize = readlink (filename, linkbuf, bufsiz);
+    if (linksize < 0) {
+        error (0, errno, "%s", filename);
+        exit_status = 1;
+        free (linkbuf);
     }
-  else
-    {
-#ifdef _AIX
-      linkbuf = (char *) xrealloc (linkbuf, linksize + 1);
-#endif
-      linkbuf[linksize] = '\0';
-      f->linkname = linkbuf;
+    else {
+        #ifdef _AIX
+            linkbuf = (char *) xrealloc (linkbuf, linksize + 1);
+        #endif
+            linkbuf[linksize] = '\0';
+            f->linkname = linkbuf;
     }
 }
 
@@ -1461,15 +1469,14 @@ print_long_format (f)
   timebuf[16] = 0;
 
   if (print_inode)
-    printf ("%6u ", f->stat.st_ino);
+    printf ("%6lu ", f->stat.st_ino);
 
-  if (print_block_size)
-    printf ("%*u ", block_size_size,
-	    convert_blocks (ST_NBLOCKS (f->stat), kilobyte_blocks));
-
+  if (print_block_size) {
+    // printf ("%*u ", block_size_size, convert_blocks (ST_NBLOCKS (f->stat), kilobyte_blocks));
+  }
   /* The space between the mode and the number of links is the POSIX
      "optional alternate access method flag". */
-  printf ("%s %3u ", modebuf, f->stat.st_nlink);
+  printf ("%s %3lu ", modebuf, f->stat.st_nlink);
 
   if (numeric_users)
     printf ("%-8u ", (unsigned int) f->stat.st_uid);
@@ -1514,7 +1521,7 @@ print_name_with_quoting (p)
   if (quote_as_string)
     putchar ('"');
 
-  while (c = *p++)
+  while ((c = *p++))
     {
       if (quote_funny_chars)
 	{
@@ -1583,11 +1590,11 @@ print_file_name_and_frills (f)
      struct file *f;
 {
   if (print_inode)
-    printf ("%6u ", f->stat.st_ino);
+    printf ("%6lu ", f->stat.st_ino);
 
-  if (print_block_size)
-    printf ("%*u ", block_size_size,
-	    convert_blocks (ST_NBLOCKS (f->stat), kilobyte_blocks));
+  if (print_block_size) {
+    // printf ("%*u ", block_size_size, convert_blocks (ST_NBLOCKS (f->stat), kilobyte_blocks));
+  }
 
   print_name_with_quoting (f->name);
 
@@ -1639,7 +1646,7 @@ length_of_file_name_and_frills (f)
   if (quote_as_string)
     len += 2;
 
-  while (c = *p++)
+  while ((c = *p++))
     {
       if (quote_funny_chars)
 	{
@@ -1900,3 +1907,16 @@ Usage: %s [-abcdgiklmnpqrstuxABCFLNQRSUX1] [-w cols] [-T cols] [-I pattern]\n\
        [--time={atime,access,use,ctime,status}] [path...]\n");
   exit (1);
 }
+
+// static long
+// adjust_blocks (blocks, fromsize, tosize)
+//      long blocks;
+//      int fromsize, tosize;
+// {
+//   if (fromsize == tosize)	/* E.g., from 512 to 512.  */
+//     return blocks;
+//   else if (fromsize > tosize)	/* E.g., from 2048 to 512.  */
+//     return blocks * (fromsize / tosize);
+//   else				/* E.g., from 256 to 512.  */
+//     return (blocks + 1) / (tosize / fromsize);
+// }
