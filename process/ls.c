@@ -955,6 +955,7 @@ gobble_file (name, explicit_arg, dirname)
   files[files_index].linkmode = 0;
 
 // if explicit_arg is 0, then this depends on format_needs_stat
+// which is set after decode_switches() in main()
 /* If nonzero, the file listing format requires that stat be called on
    each file. */
   if (explicit_arg || format_needs_stat)
