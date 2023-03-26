@@ -8,18 +8,23 @@
 // #define _DEFAULT_SOURCE
 #include <dirent.h>
 #include <sys/stat.h>
+#include <getopt.h>
 #include "mashtool.h"
 
-typedef enum filetype
-{
+#define COLOR_RED   "/033[0;31m]"
+
+int32_t decode_switches(int argc, char* argv);
+void usage();
+
+enum filetype {
     symbolic_link,
     named_pipe,
     directory,
     arg_directory,          /* Directory given as command line arg. Ended with forward slash '/' */
     normal			        /* All others. */
-} filetype;
+};
 
-typedef struct file {
+struct file {
     /* The file name */
     char* name;
 
@@ -28,68 +33,240 @@ typedef struct file {
     /* For symbolic link, name of the file linked to, otherwise NULL */
     char* link_name;
 
-    filetype filetype;
+    enum filetype filetype;
 
-} file;
+};
 
-int main(int argc, char* argv[]) {
-    /*
-        TODO: Summarize the functionality of this function
-        https://stackoverflow.com/questions/4204666/how-to-list-files-in-a-directory-in-a-c-program
+/* Array of files passed in argv */
+
+struct file* files;
+
+/* Record of one pending directory waiting to be listed.  */
+
+struct pending {
+  char *name;
+  /* If the directory is actually the file pointed to by a symbolic link we
+     were told to list, `realname' will contain the name of the symbolic
+     link, otherwise zero. */
+  char *realname;
+  struct pending *next;
+};
+
+/* Array of pending directories */
+
+struct pending *pending_dirs;
+
+/* sort type to be used in different sorting options */
+
+enum sort_type {
+  sort_none,			/* -U */
+  sort_name,			/* default */
+  sort_extension,		/* -X */
+  sort_time,			/* -t */
+  sort_size			    /* -S */
+};
+
+enum sort_type sort_type;
+bool sort_reverse;
+
+
+enum format {
+    short_format,       /* default */
+    long_format,		/* -l */
+    one_per_line,		/* -1 */
+    with_commas			/* -m */
+};
+
+enum format format;
+
+
+/* none means don't mention the type of files.
+   all means mention the types of all files.
+   not_programs means do so except for executables.
+   Controlled by -F and -p.  */
+
+enum indicator_style {
+  none,				    /* default */
+  all				    /* -F */
+};
+
+enum indicator_style indicator_style;
+
+
+/* Nonzero means don't omit files whose names start with `.'.  -A */
+
+bool all_files;
+
+/* Nonzero means don't omit files `.' and `..'
+   This flag implies `all_files'.  -a  */
+
+bool really_all_files;
+
+/* Entry point of the program */
+
+int 
+main(int argc, char* argv[]) {
+    int32_t i;
+
+    /* 
+        Initialize global variables;
+        Put all switches to default value;
     */
-    
-    // TODO: implement some flags for ls
-    DIR* d;
-    struct dirent* dir;
-    d = opendir(".");
-    int32_t fileCount = 0;
-    if (d) {
-        while ((dir = readdir(d)) != NULL) {
-            if (dir->d_type == DT_REG) {
-                fileCount++;
-            }
-        }
-        // Now load all filenames into an array
-        // First rewind to beginning of folder
-        rewinddir(d);
-        char** filename = malloc(fileCount * sizeof(char*));
-        fileCount = 0;
-        while ((dir = readdir(d)) != NULL) {
-            if (dir->d_type == DT_REG) {
-                int len = strlen(dir->d_name) + 1;
-                char* n = malloc(len + 1);
-                strncpy(n, dir->d_name, len);
 
-                filename[fileCount] = n;
-                fileCount++;
-            }
-        }
-        // Insertion sort, use strcasecmp() to compare
-        // First compare 1 with 0, obtain a stable 0~1
-        // Next compare 2 with 0~1, obtain a stable 0~2
-        // ...until compare n-1 with 0~n-2, obtain a stable 0~n-1, done
-        int32_t next = 1;
-        while (next < fileCount) {
-            int32_t walker = next;
-            while (walker > 0 && strcasecmp(filename[walker - 1], filename[walker]) > 0) {
-                char* temp = filename[walker];
-                filename[walker] = filename[walker - 1];
-                filename[walker - 1] = temp;
-                walker--;
-            }
-            next++;
-        }
-        // test print
-        for (int i = 0; i < fileCount; i++) {
-            printf("%s  ", filename[i]);
-        }
-        printf("\n");
-        // Clean up
-        for (int i = 0; i < fileCount; i++) {
-            free(filename[i]);
-        }
-        free(filename);
-        closedir(d);
-    }
+    files = NULL;
+    pending_dirs = NULL;
+    sort_type = sort_name;
+    sort_reverse = false;
+    format = short_format;
+    indicator_style = none;
+    all_files = false;
+    really_all_files = false;
+
+    i = decode_switches(argc, argv);
+
     return EXIT_SUCCESS;
 }
+
+/* long option struct for decode_switches() */
+struct option long_options[] =
+{
+    {"all", 0, 0, 'a'},
+    {"reverse", 0, 0, 'r'},
+    {"almost-all", 0, 0, 'A'},
+    {"file-type", 0, 0, 'F'},
+    {"literal", 0, 0, 'N'},
+    {"quote-name", 0, 0, 'Q'},
+    {"recursive", 0, 0, 'R'},
+    {0, 0, 0, 0}
+};
+
+int32_t 
+decode_switches(int argc, char* argv) {
+    /*
+        Reading each argv and modify switches
+    */
+    int c;
+    
+    while ((c = getopt_long(argc, argv, "almrtAFSUX1", long_options, NULL)) != EOF) {
+        switch (c) {
+            case 'a':
+                all_files = true;
+                really_all_files = true;
+                break;
+            case 'l':
+                format = long_format;
+                break;
+            case 'm':
+                format = with_commas;
+                break;
+            case 'r':
+                sort_reverse = true;
+                break;
+            case 't':
+                sort_type = sort_time;
+                break;
+            case 'A':
+                all_files = true;
+                break;
+            case 'F':
+                indicator_style = all;
+                break;
+            case 'S':
+                sort_type = sort_size;
+                break;
+            case 'U':
+                sort_type = sort_none;
+                break;
+            case 'X':
+                sort_type = sort_extension;
+                break;
+            case '1':
+                format = one_per_line;
+                break;
+            default:
+                // Wrong argument, print usage
+                usage();
+                break;
+        }
+    }
+
+    /* Index in ARGV of the next element to be scanned.
+    This is used for communication to and from the caller
+    and for communication between successive calls to 'getopt'.
+
+    On entry to 'getopt', zero means this is the first call; initialize.
+
+    When 'getopt' returns -1, this is the index of the first of the
+    non-option elements that the caller should itself scan.
+
+    Otherwise, 'optind' communicates from one call to the next
+    how much of ARGV has been scanned so far.  */
+    return optind;
+}
+
+void usage() {
+    printf("ls: invalid option\n");
+    printf("Try 'ls --help' for more information.\n");
+}
+
+// int main(int argc, char* argv[]) {
+//     /*
+//         TODO: Summarize the functionality of this function
+//         https://stackoverflow.com/questions/4204666/how-to-list-files-in-a-directory-in-a-c-program
+//     */
+    
+//     // TODO: implement some flags for ls
+//     DIR* d;
+//     struct dirent* dir;
+//     d = opendir(".");
+//     int32_t fileCount = 0;
+//     if (d) {
+//         while ((dir = readdir(d)) != NULL) {
+//             if (dir->d_type == DT_REG) {
+//                 fileCount++;
+//             }
+//         }
+//         // Now load all filenames into an array
+//         // First rewind to beginning of folder
+//         rewinddir(d);
+//         char** filename = malloc(fileCount * sizeof(char*));
+//         fileCount = 0;
+//         while ((dir = readdir(d)) != NULL) {
+//             if (dir->d_type == DT_REG) {
+//                 int len = strlen(dir->d_name) + 1;
+//                 char* n = malloc(len + 1);
+//                 strncpy(n, dir->d_name, len);
+
+//                 filename[fileCount] = n;
+//                 fileCount++;
+//             }
+//         }
+//         // Insertion sort, use strcasecmp() to compare
+//         // First compare 1 with 0, obtain a stable 0~1
+//         // Next compare 2 with 0~1, obtain a stable 0~2
+//         // ...until compare n-1 with 0~n-2, obtain a stable 0~n-1, done
+//         int32_t next = 1;
+//         while (next < fileCount) {
+//             int32_t walker = next;
+//             while (walker > 0 && strcasecmp(filename[walker - 1], filename[walker]) > 0) {
+//                 char* temp = filename[walker];
+//                 filename[walker] = filename[walker - 1];
+//                 filename[walker - 1] = temp;
+//                 walker--;
+//             }
+//             next++;
+//         }
+//         // test print
+//         for (int i = 0; i < fileCount; i++) {
+//             printf("%s  ", filename[i]);
+//         }
+//         printf("\n");
+//         // Clean up
+//         for (int i = 0; i < fileCount; i++) {
+//             free(filename[i]);
+//         }
+//         free(filename);
+//         closedir(d);
+//     }
+//     return EXIT_SUCCESS;
+// }
