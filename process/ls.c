@@ -974,7 +974,7 @@ gobble_file (name, explicit_arg, dirname)
 // attach basically make path={dirname}/{name}\0
 	  attach (path, dirname, name);
 	}
-// If it's a symbolic link
+// If we want to trace links to pointed objects
       if (trace_links)
 	{
 // man lstat

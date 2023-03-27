@@ -15,6 +15,8 @@
 
 int32_t decode_switches(int argc, char* argv);
 void usage();
+void clear_files();
+int gobble_file(char* name);
 
 enum filetype {
     symbolic_link,
@@ -37,9 +39,22 @@ struct file {
 
 };
 
+/* Do we trace links to pointed object or not? */
+
+bool trace_links;
+
 /* Array of files passed in argv */
 
 struct file* files;
+
+/* Length of block that `files' points to, measured in files. */
+// This determines the allocated space of files//
+
+int nfiles;
+
+/* Index of first unused in `files'. */
+
+int files_index;
 
 /* Record of one pending directory waiting to be listed.  */
 
@@ -102,6 +117,14 @@ bool all_files;
 
 bool really_all_files;
 
+/* 
+    Nonzero means we are listing the working directory because no
+    non-option arguments were given. 
+    Example: ls -aml
+*/
+
+bool dir_defaulted;
+
 /* Entry point of the program */
 
 int 
@@ -121,8 +144,41 @@ main(int argc, char* argv[]) {
     indicator_style = none;
     all_files = false;
     really_all_files = false;
+    dir_defaulted = true;
+    trace_links = false;
+
+    /* Modify switches based on user input */
 
     i = decode_switches(argc, argv);
+
+    /* Initialize array of file */
+    nfiles = 0x100;
+    files = malloc(nfiles * sizeof(struct file));
+    files_index = 0;
+
+    clear_files();
+
+    
+    /*
+        Now we have option part of argv,
+        if we have more contents they mean files/directories/whatever,
+        or if we don't have anything else it means to print the cwd.
+
+        Example: ls -ml
+        - Two options and done, this means to print the cwd with 'm' 'l' switches
+
+        Example: ls -R ~/Develop
+        - One option, and then a folder (or a file as we are not sure which one it is)
+    */
+
+    if (i < argc) {
+        // We do have some non-option args
+        dir_defaulted = false;
+    }
+
+    for (; i < argc; i++) {
+        gobble_file(argv[i]);
+    }
 
     return EXIT_SUCCESS;
 }
@@ -134,6 +190,7 @@ struct option long_options[] =
     {"reverse", 0, 0, 'r'},
     {"almost-all", 0, 0, 'A'},
     {"file-type", 0, 0, 'F'},
+    {"dereference", 0, 0, 'L'},
     {"literal", 0, 0, 'N'},
     {"quote-name", 0, 0, 'Q'},
     {"recursive", 0, 0, 'R'},
@@ -147,7 +204,7 @@ decode_switches(int argc, char* argv) {
     */
     int c;
     
-    while ((c = getopt_long(argc, argv, "almrtAFSUX1", long_options, NULL)) != EOF) {
+    while ((c = getopt_long(argc, argv, "almrtAFLSUX1", long_options, NULL)) != EOF) {
         switch (c) {
             case 'a':
                 all_files = true;
@@ -170,6 +227,9 @@ decode_switches(int argc, char* argv) {
                 break;
             case 'F':
                 indicator_style = all;
+                break;
+            case 'L':
+                trace_links = true;
                 break;
             case 'S':
                 sort_type = sort_size;
@@ -204,9 +264,73 @@ decode_switches(int argc, char* argv) {
     return optind;
 }
 
-void usage() {
+void 
+usage() {
     printf("ls: invalid option\n");
     printf("Try 'ls --help' for more information.\n");
+}
+
+void 
+clear_files() {
+    for (int i = 0; i < nfiles; i++) {
+        free(files[i].name);
+        files[i].name = NULL;
+        free(files[i].link_name);
+        files[i].link_name = NULL;
+    }
+    files_index = 0;
+}
+
+int 
+gobble_file(char* name) {
+    // gobble_file runs inside a loop and each loop consumes a new filename.
+    // Potentially the # of files can reach files_index,
+    // and we will have to realloc the array.
+    // We follow the simple strategy of doubling the space of the array
+    // everytime the array reaches nfiles
+
+    if (files_index == nfiles) {
+        nfiles *= 2;
+        files = realloc(files, nfiles * sizeof(struct file));
+    }
+
+    if (stat(name, &(files[files_index].stat)) == -1) {
+        perror("stat failed");
+        exit(EXIT_FAILURE);
+    }
+
+    /* if trace symbolic links, use stat(), else use lstat() */
+    // Please note that we don't actually know whether the name is a symbolic link
+    // Neither do we know whether the pointed object is valid even if it is
+    // Thus we catch exception here to use lstat() if stat() fails
+    // The purpose of the next block is just to load struct stat
+    files[files_index].link_name = NULL;
+    files[files_index].name = NULL;
+
+    if (trace_links) {
+        // We first use stat() and assume the link is valid
+        if (stat(name, &(files[files_index].stat)) != 0) {
+            // Then if it fails we switch to lstat()
+            if (lstat(name, &(files[files_index].stat)) != 0) {
+                fprintf(stderr, "lstat() failed in %s\n", __func__);
+            }
+        }
+    }
+    else {
+        // Since we don't care about pointed object, just use lstat()
+        if (lstat(name, &(files[files_index].stat)) != 0) {
+            fprintf(stderr, "lstat() failed in %s\n", __func__);
+        }
+    }
+
+    // Now struct stat has been loaded, we start to process information for symbolic links
+    // S_ISLNK() returns true if file is
+    #ifdef S_ISLNK
+    if (S_ISLNK(files[files_index].stat.st_mode)) {
+        
+    }
+    #endif
+
 }
 
 // int main(int argc, char* argv[]) {
