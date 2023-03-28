@@ -1053,8 +1053,7 @@ gobble_file (name, explicit_arg, dirname)
 // First if: is the object a directory?
 	if (S_ISDIR (files[files_index].stat.st_mode))
 	  {
-// Seoncd if: OK it's a directory, now is explicit_arg 1 && it's directory name?
-// I don't quite understand this part, why the double check for directory?
+// Seoncd if: OK it's a directory, now is explicit_arg 1 && only show dir name, not contents
 	    if (explicit_arg && !immediate_dirs)
 // arg_directory: Directory given as command line arg.
 	      files[files_index].filetype = arg_directory;

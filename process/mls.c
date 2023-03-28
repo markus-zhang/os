@@ -16,7 +16,7 @@
 int32_t decode_switches(int argc, char* argv);
 void usage();
 void clear_files();
-int gobble_file(char* name);
+int gobble_file(char* name, bool explocit_arg);
 char* make_link_path(char* path, char* linkname);
 
 enum filetype {
@@ -71,6 +71,10 @@ struct pending {
 /* Array of pending directories */
 
 struct pending *pending_dirs;
+
+/* If true then show directory name instead of contents */
+
+bool immediate_dirs;
 
 /* sort type to be used in different sorting options */
 
@@ -139,6 +143,7 @@ main(int argc, char* argv[]) {
 
     files = NULL;
     pending_dirs = NULL;
+    immediate_dirs = false;
     sort_type = sort_name;
     sort_reverse = false;
     format = short_format;
@@ -178,7 +183,8 @@ main(int argc, char* argv[]) {
     }
 
     for (; i < argc; i++) {
-        gobble_file(argv[i]);
+        // explicit_arg set to true as user explicitly gives args
+        gobble_file(argv[i], true);
     }
 
     return EXIT_SUCCESS;
@@ -211,6 +217,8 @@ decode_switches(int argc, char* argv) {
                 all_files = true;
                 really_all_files = true;
                 break;
+            case 'd':
+                immediate_dirs = true;
             case 'l':
                 format = long_format;
                 break;
@@ -283,7 +291,7 @@ clear_files() {
 }
 
 int 
-gobble_file(char* name) {
+gobble_file(char* name, bool explicit_arg) {
     // gobble_file runs inside a loop and each loop consumes a new filename.
     // Potentially the # of files can reach files_index,
     // and we will have to realloc the array.
@@ -329,8 +337,26 @@ gobble_file(char* name) {
     #ifdef S_ISLNK
     if (S_ISLNK(files[files_index].stat.st_mode)) {
         get_link_name(name, &files[files_index]);
+        // Let's ignore make_link_path first
+        make_link_path(NULL, NULL);
+        files[files_index].filetype = symbolic_link;
     }
     #endif
+
+    // Now we turn to the case of directories
+    // I think filetype leads to different print outs, will see
+    #ifdef S_ISDIR
+    if (IS_DIR(files[files_index].stat.st_mode)) {
+        if (explicit_arg && !immediate_dirs) {
+            files[files_index].filetype = arg_directory;
+        }
+        else {
+            files[files_index].filetype = directory;
+        }
+    }
+    #endif
+
+    // Now we tuen to blocks
 
 }
 
@@ -377,7 +403,7 @@ get_link_name(char* filename, struct file* f) {
 
 char* 
 make_link_path(char* path, char* linkname) {
-    
+    return NULL;
 }
 
 // int main(int argc, char* argv[]) {
