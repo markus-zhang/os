@@ -8,9 +8,9 @@
         "name": "(gdb) Launch",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceRoot}/process/pl1.c",
+        "program": "${workspaceRoot}/process/stat_research",
         "cwd": "${workspaceRoot}/process",
-        "args": [],
+        "args": ["~/process"],
         "MIMode": "gdb",
         "setupCommands": [
             {

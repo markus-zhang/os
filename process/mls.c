@@ -17,6 +17,7 @@ int32_t decode_switches(int argc, char* argv);
 void usage();
 void clear_files();
 int gobble_file(char* name);
+char* make_link_path(char* path, char* linkname);
 
 enum filetype {
     symbolic_link,
@@ -327,10 +328,56 @@ gobble_file(char* name) {
     // S_ISLNK() returns true if file is
     #ifdef S_ISLNK
     if (S_ISLNK(files[files_index].stat.st_mode)) {
-        
+        get_link_name(name, &files[files_index]);
     }
     #endif
 
+}
+
+void 
+get_link_name(char* filename, struct file* f) {
+    /*
+        For symbolic links, use readlink() to fetch information of linked object
+        We need to be careful about broken symbolic links though
+        Those links don't link to anything
+    */
+    int buffer_size = f->stat.st_size;
+    // Add 1 for '\0' just in case (usually linkbuffer only needs like 100 char maximum)
+    char* linkbuffer = malloc(buffer_size + 1);
+    int len;
+    if ((len = readlink(filename, linkbuffer, buffer_size)) != -1) {
+        linkbuffer[len] = '\0';
+        f->link_name = linkbuffer;
+    }
+    else {
+        fprintf(stderr, "readlink() error: %s\n", __func__);
+        free(linkbuffer);
+        linkbuffer = NULL;
+        exit(EXIT_FAILURE);
+    }
+}
+
+/*  If `linkname' is a relative path and `path' contains one or more
+    leading directories, return `linkname' with those directories
+    prepended; otherwise, return a copy of `linkname'.
+    If `linkname' is zero, return zero. 
+*/
+
+/*  Relative path is defined as path related to the present working directory(pwd). 
+    Consider there is a path: ~/Develop/sysprog/os/process
+    We can go down to ~/Develop/sysprog/os/process, and type:
+    ln -s ../os/process ~/process
+    This will create a symbolic link to a relactive path 
+*/
+
+/*
+    An absolute path always starts with '/'
+    /home/Develop/sysprog/os/process
+*/
+
+char* 
+make_link_path(char* path, char* linkname) {
+    
 }
 
 // int main(int argc, char* argv[]) {
