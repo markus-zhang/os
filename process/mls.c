@@ -16,8 +16,9 @@
 int32_t decode_switches(int argc, char* argv);
 void usage();
 void clear_files();
-int gobble_file(char* name, bool explocit_arg);
+int gobble_file(char* name, bool explicit_arg);
 char* make_link_path(char* path, char* linkname);
+void queue_directory (char* name, char* realname);
 
 enum filetype {
     symbolic_link,
@@ -185,6 +186,32 @@ main(int argc, char* argv[]) {
     for (; i < argc; i++) {
         // explicit_arg set to true as user explicitly gives args
         gobble_file(argv[i], true);
+    }
+
+    // when i == argc, dir_defaulted = true, we are basically showing .
+    // if immediate_dirs is true, we just show ., not the contents (pretty dumb TBH)
+
+    if (dir_defaulted) {
+        if (immediate_dirs) {
+            /*
+                We might want to understand what happens in gobble_file(".", 1)
+                Best way is to first look at the original ls.c, which is gobble_file(".", 1, "")
+                - Initiate files[files_index].linkname and linkmode (not available in my version)
+                - Scroll down until S_ISDIR block because it is a directory
+                - Recall that immediate_dirs is true, so files[files_index].filetype = directory
+                This basically says, OK, "." is a directory and we should only print itself
+
+                Now if we scroll further down to print_current_files()
+                let's pick case many_per_line and scroll to print_many_per_line()
+                Following function call, it goes to print_file_name_and_frills()
+
+
+            */
+            gobble_file(".", 1);
+        }
+        else {
+            queue_directory(".", 0);
+        }
     }
 
     return EXIT_SUCCESS;
@@ -357,7 +384,12 @@ gobble_file(char* name, bool explicit_arg) {
     #endif
 
     // Now we tuen to blocks
+    // We don't implement --block-size so I'll just use stat.st_block
+    // which is default to block size of 512B
+    int blocks = files[files_index].stat.st_blocks;
+    files[files_index].name = strndup(name, strlen(name) + 1);
 
+    return blocks;
 }
 
 void 
@@ -380,6 +412,24 @@ get_link_name(char* filename, struct file* f) {
         free(linkbuffer);
         linkbuffer = NULL;
         exit(EXIT_FAILURE);
+    }
+}
+
+void
+queue_directory (char* name, char* realname) {
+    struct pending* new = malloc(sizeof(struct pending));
+    // Looks like it's prepending struct pending*
+    // First node is: node1->node1
+    // When the second gets inserted, we have node2->next = node1 and pending_dirs = node2
+    new->next = pending_dirs;
+    pending_dirs = new;
+    new->name = strndup(name, strlen(name) + 1);
+
+    if (realname) {
+        new->realname = strndup(realname, strlen(realname) + 1);
+    }
+    else {
+        new->realname = NULL;
     }
 }
 

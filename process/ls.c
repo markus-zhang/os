@@ -1067,7 +1067,18 @@ gobble_file (name, explicit_arg, dirname)
 // in lib/fsusage.c
 // https://github.com/wertarbyte/coreutils/commit/14fd34b78818660e05806b6eda178e3f846c5c21#diff-1a52694050e227431a5338b65ff88dda17a64fa5d4ea52fef2bc5090efe96069
 // #define convert_blocks(b) adjust_blocks ((b), 1024, 512)
-// FIXME: I don't quite get what it does, maybe it is to scale down struct size to save space?
+// 
+// I think I know what's happening here
+// 1)   blocks can be any size, e.g. 1MB, 2KB, 10KB, with KB as minimum
+//      ls -l will print the number of blocks in the column before date
+//      try: ls -l --block-size=1KB
+// 2)   Now ls needs to know how many characters the number of blocks have
+//      For example, if a file is 17KB and block size is 1KB, ls should print 17
+//      which is 2 chars
+// 3)   ST_NBLOCKS() is an old function to calculate the number of blocks
+//      However, it's a lot easier to use the stat.st_blocks to find number of blocks
+//      But st_blocks defaults on block size of 512B
+//      What we can do is to simply divide st_size in bytes by --block-size
       blocks = convert_blocks (ST_NBLOCKS (files[files_index].stat),
 			       kilobyte_blocks);
       if (blocks >= 10000 && block_size_size < 5)
