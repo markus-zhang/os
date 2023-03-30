@@ -1572,6 +1572,7 @@ print_name_with_quoting (p)
 	}
       else
 	{
+        // He is using Oct
 	  if (c >= 040 && c < 0177)
 	    putchar (c);
 	  else if (!qmark_funny_chars)

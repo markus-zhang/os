@@ -21,6 +21,9 @@ char* make_link_path(char* path, char* linkname);
 void queue_directory (char* name, char* realname);
 void extract_dirs_from_files (char* dirname, int recursive);
 bool is_not_dot_or_dotdot(char* name);
+void print_current_files();
+void print_file_name_and_frills(struct file* f);
+void print_name_with_quoting(char* name);
 
 enum filetype {
     symbolic_link,
@@ -133,6 +136,21 @@ bool really_all_files;
 
 bool dir_defaulted;
 
+/* Print related global variables */
+
+/* Nonzero means output each file name using C syntax for a string.
+   Always accompanied by `quote_funny_chars'.
+   This mode, together with -x or -C or -m,
+   and without such frills as -F or -s,
+   is guaranteed to make it possible for a program receiving
+   the output to tell exactly what file names are present.  -Q  */
+
+bool quote_as_string;
+
+
+/* Do we mark funny chars as '?' */
+bool qmark_funny_chars;
+
 /* Entry point of the program */
 
 int 
@@ -155,6 +173,8 @@ main(int argc, char* argv[]) {
     really_all_files = false;
     dir_defaulted = true;
     trace_links = false;
+    quote_as_string = false;
+    qmark_funny_chars = true;
 
     /* Modify switches based on user input */
 
@@ -223,6 +243,11 @@ main(int argc, char* argv[]) {
                 extract_dirs_from_files("", 0);
             }
         }
+
+        /* extract_dirs_from_files() may decrease files_index so check again */
+        if (files_index) {
+            print_current_files();
+        }
     }
 
     return EXIT_SUCCESS;
@@ -232,6 +257,7 @@ main(int argc, char* argv[]) {
 struct option long_options[] =
 {
     {"all", 0, 0, 'a'},
+    {"escape", 0, 0, 'b'},
     {"reverse", 0, 0, 'r'},
     {"almost-all", 0, 0, 'A'},
     {"file-type", 0, 0, 'F'},
@@ -255,6 +281,9 @@ decode_switches(int argc, char* argv) {
                 all_files = true;
                 really_all_files = true;
                 break;
+            case 'b':
+                qmark_funny_chars = false;
+                break;
             case 'd':
                 immediate_dirs = true;
             case 'l':
@@ -262,6 +291,9 @@ decode_switches(int argc, char* argv) {
                 break;
             case 'm':
                 format = with_commas;
+                break;
+            case 'q':
+                qmark_funny_chars = true;
                 break;
             case 'r':
                 sort_reverse = true;
@@ -519,6 +551,59 @@ is_not_dot_or_dotdot(char* name) {
         return true;
     }
     return false;
+}
+
+void
+print_current_files() {
+    switch(format) {
+        case one_per_line:
+            for (int i = 0; i < files_index; i++) {
+                /* Directly using pointer arithmetric */
+                print_file_name_and_frills(files + i);
+                putchar('\n');
+            }
+            break;
+    }
+}
+
+void 
+print_file_name_and_frills(struct file* f) {
+    print_name_with_quoting(f->name);
+
+    /* print file type indicator (e.g. directory get '/') */
+    if (indicator_style != none) {
+        print_type_indicator(f->stat.st_mode);
+    }
+}
+
+void
+print_name_with_quoting(char* name) {
+    if (quote_as_string) {
+        putchar('"');
+    }
+
+    for (int i = 0; i < strlen(name); i++) {
+        char c = name[i];
+        // ignore quote_funny_characters for now
+        if (c >= 0x20 && c <= 0x7E) {
+            putchar(c);
+        }
+        else if (!qmark_funny_chars) {
+            putchar(c);
+        }
+        else {
+            putchar('?');
+        }
+    }
+
+    if (quote_as_string) {
+        putchar('"');
+    }
+}
+
+void
+print_type_indicator(unsigned int mode) {
+
 }
 
 // int main(int argc, char* argv[]) {
