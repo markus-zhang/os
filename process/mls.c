@@ -19,6 +19,8 @@ void clear_files();
 int gobble_file(char* name, bool explicit_arg);
 char* make_link_path(char* path, char* linkname);
 void queue_directory (char* name, char* realname);
+void extract_dirs_from_files (char* dirname, int recursive);
+bool is_not_dot_or_dotdot(char* name);
 
 enum filetype {
     symbolic_link,
@@ -211,6 +213,15 @@ main(int argc, char* argv[]) {
         }
         else {
             queue_directory(".", 0);
+        }
+
+        // If there are more than 0 file grobbed
+        if (files_index) {
+            /* Let's assume we don't sort */
+            // sort_files();
+            if (!immediate_dirs) {
+                extract_dirs_from_files("", 0);
+            }
         }
     }
 
@@ -454,6 +465,60 @@ queue_directory (char* name, char* realname) {
 char* 
 make_link_path(char* path, char* linkname) {
     return NULL;
+}
+
+
+/* Remove any entries from `files' that are for directories,
+   and queue them to be listed as directories instead.
+   `dirname' is the prefix to prepend to each dirname
+   to make it correct relative to ls's working dir.
+   `recursive' is nonzero if we should not treat `.' and `..' as dirs.
+   This is desirable when processing directories recursively.  */
+
+void
+extract_dirs_from_files (char* dirname, int recursive) {
+    int dirlen = strlen(dirname) + 2;
+
+    /* Queue the directories last one first, because queueing reverses the
+     order.  */
+
+    for (int i = files_index - 1; i >= 0; i--) {
+        if ((files[i].filetype == directory || files[i].filetype == arg_directory)
+            && (!recursive || is_not_dot_or_dotdot(files[i].name))) {
+            if (files[i].name[0] == '/' || dirname[0] == 0) {
+                queue_directory(files[i].name, files[i].link_name);
+            }
+            else {
+                // No idea what this part does so ignore first
+            }
+            if (files[i].filetype == arg_directory) {
+                free(files[i].name);
+            }
+        }
+    }
+
+    /* Now delete the directories from the table, compacting all the remaining
+     entries.  */
+    int i = 0;
+    int j = 0;
+    
+    for (; i < files_index; i++) {
+        if (files[i].filetype != arg_directory) {
+            files[j++] = files[i];
+        }
+    }
+    files_index = j;
+}
+
+bool
+is_not_dot_or_dotdot(char* name) {
+    if (strlen(name) == 1 && strncmp(name, ".") == 0) {
+        return true;
+    }
+    if (strlen(name) == 2 && strncmp(name, "..") == 0) {
+        return true;
+    }
+    return false;
 }
 
 // int main(int argc, char* argv[]) {
