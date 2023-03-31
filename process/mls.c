@@ -9,6 +9,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <getopt.h>
+#include <sys/ioctl.h>
 #include "mashtool.h"
 
 #define COLOR_RED   "/033[0;31m]"
@@ -155,6 +156,9 @@ bool quote_as_string;
 /* Do we mark funny chars as '?' */
 bool qmark_funny_chars;
 
+/* Total length of terminal line in char */
+int line_length;
+
 /* Entry point of the program */
 
 int 
@@ -179,6 +183,17 @@ main(int argc, char* argv[]) {
     trace_links = false;
     quote_as_string = false;
     qmark_funny_chars = true;
+    line_length = 80;   // default on 80 characters per line
+
+    #ifdef TIOCGWINSZ
+    {
+        struct winsize ws;
+
+        if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != -1 && ws.ws_col != 0) {
+            line_length = ws.ws_col;
+        }
+    }
+    #endif
 
     /* Modify switches based on user input */
 
@@ -263,6 +278,7 @@ struct option long_options[] =
     {"all", 0, 0, 'a'},
     {"escape", 0, 0, 'b'},
     {"reverse", 0, 0, 'r'},
+    {"width", 1, 0, 'w'},
     {"almost-all", 0, 0, 'A'},
     {"file-type", 0, 0, 'F'},
     {"dereference", 0, 0, 'L'},
@@ -304,6 +320,12 @@ decode_switches(int argc, char* argv) {
                 break;
             case 't':
                 sort_type = sort_time;
+                break;
+            case 'w':
+                line_length = atoi(optarg);
+                if (line_length < 16) {
+                    fprint(stderr, "line_length must be greater than or equal to 16\n");
+                }
                 break;
             case 'A':
                 all_files = true;
@@ -679,7 +701,19 @@ print_with_commas() {
     int cur = 0;
     int cur_next = 0;
 
-    for ()
+    for (int i = 0; i < files_index; i++) {
+        cur_next += length_of_file_name_and_frills(files + i);
+        if (i + 1 < files_index) {
+            cur_next += 2;
+        }
+        if (cur_next > line_length && i > 0) {
+            putchar('\n');
+            cur_next -= cur;
+        }
+        if (i + 1 < files_index) {
+            printf(", ");
+        }
+    }
 }
 
 // int main(int argc, char* argv[]) {
