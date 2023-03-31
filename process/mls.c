@@ -12,6 +12,9 @@
 #include "mashtool.h"
 
 #define COLOR_RED   "/033[0;31m]"
+#ifndef S_IEXEC
+#define S_IEXEC S_IXUSR
+#endif
 
 int32_t decode_switches(int argc, char* argv);
 void usage();
@@ -24,6 +27,7 @@ bool is_not_dot_or_dotdot(char* name);
 void print_current_files();
 void print_file_name_and_frills(struct file* f);
 void print_name_with_quoting(char* name);
+void print_with_commas();
 
 enum filetype {
     symbolic_link,
@@ -544,10 +548,10 @@ extract_dirs_from_files (char* dirname, int recursive) {
 
 bool
 is_not_dot_or_dotdot(char* name) {
-    if (strlen(name) == 1 && strncmp(name, ".") == 0) {
+    if ((strlen(name) == 1) && (strncmp(name, ".", 1) == 0)) {
         return true;
     }
-    if (strlen(name) == 2 && strncmp(name, "..") == 0) {
+    if ((strlen(name) == 2) && (strncmp(name, "..", 2) == 0)) {
         return true;
     }
     return false;
@@ -563,11 +567,16 @@ print_current_files() {
                 putchar('\n');
             }
             break;
+        case with_commas:
+            print_with_commas();
+            break;
     }
 }
 
 void 
 print_file_name_and_frills(struct file* f) {
+    // ignored inode, block size
+
     print_name_with_quoting(f->name);
 
     /* print file type indicator (e.g. directory get '/') */
@@ -601,9 +610,76 @@ print_name_with_quoting(char* name) {
     }
 }
 
+/* prints indicator immediately following file name */
+
 void
 print_type_indicator(unsigned int mode) {
+    if (S_ISDIR(mode)) {
+        putchar('/');
+    }
 
+    if (S_ISLNK(mode)) {
+        putchar('@');
+    }
+
+    if (S_ISFIFO(mode)) {
+        putchar('|');
+    }
+
+    if (S_ISSOCK(mode)) {
+        putchar('=');
+    }
+
+    /*
+        Here's how the expression evaluates step by step:
+
+        S_IEXEC is a bitmask that represents the execute permission bit, 
+        which has a value of 0100 in octal notation or 0x40 in hexadecimal notation.
+
+        S_IEXEC >> 3 shifts the S_IEXEC bitmask to the right by 3 bits, 
+        which results in a value of 0010 in octal notation or 0x08 in hexadecimal notation. 
+        This represents the execute permission bit for the group.
+
+        S_IEXEC >> 6 shifts the S_IEXEC bitmask to the right by 6 bits, 
+        which results in a value of 0001 in octal notation or 0x01 in hexadecimal notation. 
+        This represents the execute permission bit for others.
+
+        The three values are combined using the bitwise OR operator (|), 
+        which results in a bitmask with the executable permission bit set in 
+        the least significant three bits, the middle three bits, and the most significant three bits.
+        The resulting value is 0111 in octal notation or 0x49 in hexadecimal notation.
+
+        The resulting bitmask can be used to test if any of the permission bits have the 
+        executable permission enabled. 
+        
+        For example, (mode & (S_IEXEC | S_IEXEC >> 3 | S_IEXEC >> 6)) can be used to test 
+        if the file represented by the mode bitmask has executable permission 
+        for the owner, group, or others.
+    */
+    if (S_ISREG(mode) && indicator_style == all) {
+        if (mode & (S_IEXEC | S_IEXEC >> 3 | S_IEXEC >> 6)) {
+            putchar('*');
+        }
+    }
+}
+
+void
+print_with_commas() {
+    /*
+        Description of original 1991 ls.c algorithm:
+
+        First calculate the # of chars needed to display file N;
+        Then look forward to find out if there is another file to display;
+        If there is one, then we need to add a comma and a space;
+        Whence everything has been calculated, we get how long the whole string is;
+        We then look at the current cursor position and check we have enough space for the line;
+        If not then we print a '\n';
+    */
+    
+    int cur = 0;
+    int cur_next = 0;
+
+    for ()
 }
 
 // int main(int argc, char* argv[]) {

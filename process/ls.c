@@ -1629,6 +1629,7 @@ print_type_indicator (mode)
     putchar ('=');
 #endif
 
+// Is this a regular executable file? S_IEXEC is 00100 which looks like octal notation
   if (S_ISREG (mode) && indicator_style == all
       && (mode & (S_IEXEC | S_IEXEC >> 3 | S_IEXEC >> 6)))
     putchar ('*');
@@ -1825,21 +1826,34 @@ print_with_commas ()
 
   pos = 0;
 
+/*
+    Basically what the loop does is to make sure that 
+    the line break occurs at the right place
+
+*/
   for (filesno = 0; filesno < files_index; filesno++)
     {
       old_pos = pos;
 
+/* add the length of the filename plus all those fancies */
       pos += length_of_file_name_and_frills (files + filesno);
+
+/* OK do we have another file to display? If yes then we need extra 2 char spaces for comma and space*/
       if (filesno + 1 < files_index)
 	pos += 2;		/* For the comma and space */
 
+/* If the first file has a super long name, prevent the program from printing an extra \n at beginning */
       if (old_pos != 0 && pos >= line_length)
 	{
 	  putchar ('\n');
+      // This is clever, say old_pos = 76, line_length = 80, and pos = 89
+      // this puts pos to 13 because the whole 13 chars gets printed to the next line
+      // as we don't allow a name to be cut in half (if that's the case then pos -= line_length)
 	  pos -= old_pos;
 	}
 
       print_file_name_and_frills (files + filesno);
+/* We already leave enough space for comma and space */
       if (filesno + 1 < files_index)
 	{
 	  putchar (',');

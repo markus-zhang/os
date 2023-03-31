@@ -221,6 +221,10 @@ int32_t process_command(char* command) {
     if ((strncmp(command, "ls\n", 3) == 0) && (strlen(command) == 3)) {
         return _internal_ls();
     }
+
+    if ((strncmp(command, "cd", 2) == 0) && (strlen(command) == 3)) {
+        return _internal_ls();
+    }
     
     return EXIT_SUCCESS;
 }
