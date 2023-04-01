@@ -30,6 +30,7 @@ void print_file_name_and_frills(struct file* f);
 void print_name_with_quoting(char* name);
 void print_with_commas();
 void print_long_format(struct file* f);
+char* get_three_permission_chars(enum permission p);
 
 enum filetype {
     symbolic_link,
@@ -159,6 +160,18 @@ bool qmark_funny_chars;
 
 /* Total length of terminal line in char */
 int line_length;
+
+/* file permission */
+enum permission {
+    no_permission =         0,
+    can_exec =              1,
+    can_write =             2,
+    can_exec_write =        3,
+    can_read =              4,
+    can_exec_read =         5,
+    can_read_write =        6,
+    all_permission =        7
+};
 
 /* Entry point of the program */
 
@@ -772,22 +785,45 @@ print_long_format(struct file* f) {
         char 2: whether can write
         char 3: whether can execute
     */
-    
-    enum permission {
-        no_permission =         0,
-        can_exec =              1,
-        can_write =             2,
-        can_exec_write =        3,
-        can_read =              4,
-        can_exec_read =         5,
-        can_read_write =        6,
-        all_permission =        7
-    };
 
     int permission_owner = (f->stat.st_mode >> 6) & 07;
     int permission_group = (f->stat.st_mode >> 3) & 07;
-    int permission_group = (f->stat.st_mode >> 0) & 07;
+    int permission_other = (f->stat.st_mode >> 0) & 07;
 
+    char* ownerp = get_three_permission_chars(permission_owner);
+    char* groupp = get_three_permission_chars(permission_group);
+    char* otherp = get_three_permission_chars(permission_other);
+
+    printf("%s", ownerp);
+    printf("%s", groupp);
+    printf("%s", otherp);
+    putchar(' ');
+    putchar(' ');
+
+}
+
+char* 
+get_three_permission_chars(enum permission p) {
+    switch(p) {
+        case no_permission:
+            return "---";
+        case can_exec:
+            return "--x";
+        case can_write:
+            return "-w-";
+        case can_exec_write:
+            return "-wx";
+        case can_read:
+            return "r--";
+        case can_exec_read:
+            return "r-x";
+        case can_read_write:
+            return "rw-";
+        case all_permission:
+            return "rwx";
+        default:
+            return "---";
+    }
 }
 
 // int main(int argc, char* argv[]) {

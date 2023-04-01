@@ -15,9 +15,38 @@ I have learned a lot so far since reading the source code of the 1991 version of
         can_read_write =        6,
         all_permission =        7
     };
-    
+
     int permission_owner = (f->stat.st_mode >> 6) & 07;
     int permission_group = (f->stat.st_mode >> 3) & 07;
     int permission_group = (f->stat.st_mode >> 0) & 07;
     ```
-5. 
+5. This is more general C programming: Why does passing pointer to literal string out of scope work?
+    ```c
+    char* pass_literal_string() {
+        char* temp = "abcdefg";
+        return temp;
+    }
+
+    int main() {
+        char* blah = pass_literal_string();
+        printf("%s\n", blah);
+
+        return 0;
+    }
+    ```
+    Why does the above code work while "abcdefg" is in another scope? Because they are usually put in **read-only-data** section, not on stack.
+
+    This, instead, does NOT work:
+    ```c
+    int* pass_integer() {
+        int temp = "abcdefg";
+        return &temp;
+    }
+
+    int main() {
+        int* blah = pass_integer();
+        printf("%d\n", blah);
+
+        return 0;
+    }
+    ```
