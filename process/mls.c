@@ -10,6 +10,9 @@
 #include <sys/stat.h>
 #include <getopt.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
+#include <pwd.h>
+#include <grp.h>
 #include "mashtool.h"
 
 #define COLOR_RED   "/033[0;31m]"
@@ -173,6 +176,9 @@ enum permission {
     all_permission =        7
 };
 
+/* -n switch: print user and group id instead of names */
+bool numeric_users;
+
 /* Entry point of the program */
 
 int 
@@ -198,6 +204,7 @@ main(int argc, char* argv[]) {
     quote_as_string = false;
     qmark_funny_chars = true;
     line_length = 80;   // default on 80 characters per line
+    numeric_users = false;
 
     #ifdef TIOCGWINSZ
     {
@@ -291,6 +298,7 @@ struct option long_options[] =
 {
     {"all", 0, 0, 'a'},
     {"escape", 0, 0, 'b'},
+    {"numeric-uid-gid", 0, 0, 'n'},
     {"reverse", 0, 0, 'r'},
     {"width", 1, 0, 'w'},
     {"almost-all", 0, 0, 'A'},
@@ -309,7 +317,7 @@ decode_switches(int argc, char* argv) {
     */
     int c;
     
-    while ((c = getopt_long(argc, argv, "almrtAFLSUX1", long_options, NULL)) != EOF) {
+    while ((c = getopt_long(argc, argv, "abdlmnqrtwAFLSUX1", long_options, NULL)) != EOF) {
         switch (c) {
             case 'a':
                 all_files = true;
@@ -325,6 +333,9 @@ decode_switches(int argc, char* argv) {
                 break;
             case 'm':
                 format = with_commas;
+                break;
+            case 'n':
+                numeric_users = true;
                 break;
             case 'q':
                 qmark_funny_chars = true;
@@ -799,6 +810,62 @@ print_long_format(struct file* f) {
     printf("%s", otherp);
     putchar(' ');
     putchar(' ');
+
+    /* Number of hard links, from st_nlink */
+    printf("%d ", f->stat.st_nlink);
+
+    /* 
+        Owner ID or Owner name 
+        Owner ID can be grabbed from st_uid
+        With that info we can pass it to getpwuid to get a struct passwd*,
+        which contains username:
+
+        struct passwd {
+            char   *pw_name;       // username
+            char   *pw_passwd;     // user password
+            uid_t   pw_uid;        // user ID
+            gid_t   pw_gid;        // group ID 
+            char   *pw_gecos;      // user information 
+            char   *pw_dir;        // home directory 
+            char   *pw_shell;      // shell program 
+        };
+    */
+
+    int owner_uid = f->stat.st_uid;
+    if (numeric_users) {
+        printf("%d\t\t", owner_uid);
+    }
+    else {
+        struct passwd* pwd = getpwuid(owner_uid);
+        printf("%s\t", pwd->pw_name);
+    }
+    
+    /* 
+        For group name, user getgrgid(), which returns a struct group:
+        struct group {
+            char   *gr_name;        // group name
+            char   *gr_passwd;      // group password
+            gid_t   gr_gid;         // group ID
+            char  **gr_mem;         // NULL-terminated array of pointers to names of group members
+        };
+    */
+
+    int group_uid = f->stat.st_gid;
+    if (numeric_users) {
+        printf("%d\t\t", group_uid);
+    }
+    else {
+        struct group* grp = getgrgid(group_uid);
+        printf("%s\t\t", grp->gr_name);
+    }
+
+    /*
+        File size, can be grabbed from st_blocks
+        But for directories and symbolic links,
+        this shows the size of the data associated with the directory or link
+    */
+    
+    int num_block = f->stat.st_blocks;
 
 }
 
