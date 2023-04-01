@@ -752,16 +752,42 @@ print_long_format(struct file* f) {
     else if (S_ISFIFO(f->stat.st_mode)) {
         type = 'p';
     }
+    #ifdef S_ISSOCK
     else if (S_ISSOCK(f->stat.st_mode)) {
         type = 's';
     }
+    #endif
     // regular file
     else {
         type = '-';
     }
     putchar(type);
 
-    /* permissions, 9 characters */
+    /* 
+        permissions, 9 characters 
+        3 chars for the owner, 3 chars for the group that owns the file,
+        3 chars for all other users
+        for the 3 characters:
+        char 1: whether can read
+        char 2: whether can write
+        char 3: whether can execute
+    */
+    
+    enum permission {
+        no_permission =         0,
+        can_exec =              1,
+        can_write =             2,
+        can_exec_write =        3,
+        can_read =              4,
+        can_exec_read =         5,
+        can_read_write =        6,
+        all_permission =        7
+    };
+
+    int permission_owner = (f->stat.st_mode >> 6) & 07;
+    int permission_group = (f->stat.st_mode >> 3) & 07;
+    int permission_group = (f->stat.st_mode >> 0) & 07;
+
 }
 
 // int main(int argc, char* argv[]) {
