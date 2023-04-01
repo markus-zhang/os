@@ -29,6 +29,7 @@ void print_current_files();
 void print_file_name_and_frills(struct file* f);
 void print_name_with_quoting(char* name);
 void print_with_commas();
+void print_long_format(struct file* f);
 
 enum filetype {
     symbolic_link,
@@ -592,6 +593,13 @@ print_current_files() {
         case with_commas:
             print_with_commas();
             break;
+        /* long format is the -l switch, thus one file per line */
+        case long_format:
+            for (int i = 0; i < files_index; i++) {
+                print_long_format(&files[i]);
+                putchar('\n');
+            }
+            break;
     }
 }
 
@@ -714,6 +722,46 @@ print_with_commas() {
             printf(", ");
         }
     }
+}
+
+void 
+print_long_format(struct file* f) {
+    /*
+        drwxr-xr-x  2 root    root         540 Mar 31 15:19 block
+
+        d: file type
+        rwxr-xr-x: permission
+    */
+
+    /* file type, 1 character */
+    char type;
+    if (S_ISDIR(f->stat.st_mode)) {
+        type = 'd';
+    }
+    else if (S_ISLNK(f->stat.st_mode)) {
+        type = 'l';
+    }
+    else if (S_ISCHR(f->stat.st_mode)) {
+        // Character devices are files that provide access to a device that
+        // transfers data one character at a time, such as keyboard or a serial port
+        type = 'c';
+    }
+    else if (S_ISBLK(f->stat.st_mode)) {
+        type = 'b';
+    }
+    else if (S_ISFIFO(f->stat.st_mode)) {
+        type = 'p';
+    }
+    else if (S_ISSOCK(f->stat.st_mode)) {
+        type = 's';
+    }
+    // regular file
+    else {
+        type = '-';
+    }
+    putchar(type);
+
+    /* permissions, 9 characters */
 }
 
 // int main(int argc, char* argv[]) {
