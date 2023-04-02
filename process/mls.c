@@ -224,6 +224,9 @@ main(int argc, char* argv[]) {
 
     i = decode_switches(argc, argv);
 
+    // ------- DEBUG
+    printf("i is %d, argc is %d\n", i, argc);
+
     /* Initialize array of file */
     nfiles = 0x100;
     files = malloc(nfiles * sizeof(struct file));
@@ -257,6 +260,14 @@ main(int argc, char* argv[]) {
     // when i == argc, dir_defaulted = true, we are basically showing .
     // if immediate_dirs is true, we just show ., not the contents (pretty dumb TBH)
 
+    // ---- DEBUG
+    if (!dir_defaulted) {
+        printf("NOT dir_defaulted\n");
+    }
+    else {
+        printf("dir_defaulted\n");
+    }
+
     if (dir_defaulted) {
         if (immediate_dirs) {
             /*
@@ -273,25 +284,35 @@ main(int argc, char* argv[]) {
 
 
             */
+        
             gobble_file(".", 1);
         }
         else {
             queue_directory(".", 0);
         }
+    }
 
-        // If there are more than 0 file grobbed
-        if (files_index) {
-            /* Let's assume we don't sort */
-            // sort_files();
-            if (!immediate_dirs) {
-                extract_dirs_from_files("", 0);
-            }
+    // If there are more than 0 file grobbed
+    if (files_index) {
+        // ----------DEBUG
+        printf("files_index: %d\n", files_index);
+        /* Let's assume we don't sort */
+        // sort_files();
+        if (!immediate_dirs) {
+            extract_dirs_from_files("", 0);
         }
+    }
 
-        /* extract_dirs_from_files() may decrease files_index so check again */
-        if (files_index) {
-            print_current_files();
-        }
+    /* extract_dirs_from_files() may decrease files_index so check again */
+    if (files_index) {
+        // ----------DEBUG
+        printf("files_index: %d\n", files_index);
+
+        print_current_files();
+    }
+
+    while(pending_dirs) {
+        
     }
 
     return EXIT_SUCCESS;
