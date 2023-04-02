@@ -13,6 +13,7 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <grp.h>
+#include <time.h>
 #include "mashtool.h"
 
 #define COLOR_RED   "/033[0;31m]"
@@ -839,7 +840,7 @@ print_long_format(struct file* f) {
         struct passwd* pwd = getpwuid(owner_uid);
         printf("%s\t", pwd->pw_name);
     }
-    
+
     /* 
         For group name, user getgrgid(), which returns a struct group:
         struct group {
@@ -865,8 +866,42 @@ print_long_format(struct file* f) {
         this shows the size of the data associated with the directory or link
     */
     
-    int num_block = f->stat.st_blocks;
+    // TODO: Implement code for directories and symbolic links
+    int size = f->stat.st_size;
+    printf("%d ", size);
 
+    /* Modification time */
+
+    char time_human_readable[64];
+    time_t last_modified_time = f->stat.st_mtime;
+    struct tm* temp;
+    temp = localtime(&last_modified_time);
+    if (temp == NULL) {
+        fprint(stderr, "localtime() failed: %s\n", __func__);
+        exit(EXIT_FAILURE);
+    }
+    if (strftime(time_human_readable, sizeof(time_human_readable), "%M %d %H%M", temp) == -1) {
+        fprint(stderr, "strftime() failed: %s\n", __func__);
+        exit(EXIT_FAILURE);
+    }
+    printf("%s ", time_human_readable);
+
+    /* filename, for symbolic links print its link_name. Print file indicator char if needed */
+    printf("%s", f->name);
+
+    if (f->filetype == symbolic_link) {
+        if (f->link_name) {
+            printf(" -> ");
+            print_name_with_quoting(f->link_name);
+            if (indicator_style != none) {
+                // TODO: Check original code and maybe implement linkmode
+                print_type_indicator(f->stat.st_mode);
+            }
+        }
+    }
+    else if (indicator_style != none) {
+        print_type_indicator(f->stat.st_mode);
+    }
 }
 
 char* 
