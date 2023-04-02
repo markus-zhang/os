@@ -50,3 +50,6 @@ I have learned a lot so far since reading the source code of the 1991 version of
         return 0;
     }
     ```
+6. How to convert a long epoch to human readable time in C?
+   https://stackoverflow.com/questions/64725951/convert-long-of-unix-epoch-timestamp-to-real-date-time
+   

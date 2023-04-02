@@ -21,21 +21,6 @@
 #define S_IEXEC S_IXUSR
 #endif
 
-int32_t decode_switches(int argc, char* argv);
-void usage();
-void clear_files();
-int gobble_file(char* name, bool explicit_arg);
-char* make_link_path(char* path, char* linkname);
-void queue_directory (char* name, char* realname);
-void extract_dirs_from_files (char* dirname, int recursive);
-bool is_not_dot_or_dotdot(char* name);
-void print_current_files();
-void print_file_name_and_frills(struct file* f);
-void print_name_with_quoting(char* name);
-void print_with_commas();
-void print_long_format(struct file* f);
-char* get_three_permission_chars(enum permission p);
-
 enum filetype {
     symbolic_link,
     named_pipe,
@@ -108,7 +93,7 @@ bool sort_reverse;
 
 
 enum format {
-    short_format,       /* default */
+    many_per_line,       /* default */
     long_format,		/* -l */
     one_per_line,		/* -1 */
     with_commas			/* -m */
@@ -180,6 +165,25 @@ enum permission {
 /* -n switch: print user and group id instead of names */
 bool numeric_users;
 
+/* non-main functions declaration */
+int32_t decode_switches(int argc, char** argv);
+void usage();
+void clear_files();
+int gobble_file(char* name, bool explicit_arg);
+void get_link_name(char* filename, struct file* f);
+char* make_link_path(char* path, char* linkname);
+void queue_directory (char* name, char* realname);
+void extract_dirs_from_files (char* dirname, int recursive);
+bool is_not_dot_or_dotdot(char* name);
+void print_current_files();
+int length_of_file_name_and_frills(struct file* f);
+void print_type_indicator(unsigned int mode);
+void print_file_name_and_frills(struct file* f);
+void print_name_with_quoting(char* name);
+void print_with_commas();
+void print_long_format(struct file* f);
+char* get_three_permission_chars(enum permission p);
+
 /* Entry point of the program */
 
 int 
@@ -196,7 +200,6 @@ main(int argc, char* argv[]) {
     immediate_dirs = false;
     sort_type = sort_name;
     sort_reverse = false;
-    format = short_format;
     indicator_style = none;
     all_files = false;
     really_all_files = false;
@@ -312,11 +315,13 @@ struct option long_options[] =
 };
 
 int32_t 
-decode_switches(int argc, char* argv) {
+decode_switches(int argc, char** argv) {
     /*
         Reading each argv and modify switches
     */
     int c;
+    /* set default value of format to many_per_line */
+    format = many_per_line;
     
     while ((c = getopt_long(argc, argv, "abdlmnqrtwAFLSUX1", long_options, NULL)) != EOF) {
         switch (c) {
@@ -350,7 +355,7 @@ decode_switches(int argc, char* argv) {
             case 'w':
                 line_length = atoi(optarg);
                 if (line_length < 16) {
-                    fprint(stderr, "line_length must be greater than or equal to 16\n");
+                    fprintf(stderr, "line_length must be greater than or equal to 16\n");
                 }
                 break;
             case 'A':
@@ -468,7 +473,7 @@ gobble_file(char* name, bool explicit_arg) {
     // Now we turn to the case of directories
     // I think filetype leads to different print outs, will see
     #ifdef S_ISDIR
-    if (IS_DIR(files[files_index].stat.st_mode)) {
+    if (S_ISDIR(files[files_index].stat.st_mode)) {
         if (explicit_arg && !immediate_dirs) {
             files[files_index].filetype = arg_directory;
         }
@@ -561,7 +566,7 @@ make_link_path(char* path, char* linkname) {
 
 void
 extract_dirs_from_files (char* dirname, int recursive) {
-    int dirlen = strlen(dirname) + 2;
+    // int dirlen = strlen(dirname) + 2;
 
     /* Queue the directories last one first, because queueing reverses the
      order.  */
@@ -624,6 +629,10 @@ print_current_files() {
                 print_long_format(&files[i]);
                 putchar('\n');
             }
+            break;
+        case many_per_line:
+            // TODO: implement this properly
+            print_with_commas();
             break;
     }
 }
@@ -813,7 +822,7 @@ print_long_format(struct file* f) {
     putchar(' ');
 
     /* Number of hard links, from st_nlink */
-    printf("%d ", f->stat.st_nlink);
+    printf("%ld ", f->stat.st_nlink);
 
     /* 
         Owner ID or Owner name 
@@ -877,11 +886,11 @@ print_long_format(struct file* f) {
     struct tm* temp;
     temp = localtime(&last_modified_time);
     if (temp == NULL) {
-        fprint(stderr, "localtime() failed: %s\n", __func__);
+        fprintf(stderr, "localtime() failed: %s\n", __func__);
         exit(EXIT_FAILURE);
     }
     if (strftime(time_human_readable, sizeof(time_human_readable), "%M %d %H%M", temp) == -1) {
-        fprint(stderr, "strftime() failed: %s\n", __func__);
+        fprintf(stderr, "strftime() failed: %s\n", __func__);
         exit(EXIT_FAILURE);
     }
     printf("%s ", time_human_readable);
@@ -926,6 +935,25 @@ get_three_permission_chars(enum permission p) {
         default:
             return "---";
     }
+}
+
+int 
+length_of_file_name_and_frills(struct file* f) {
+    int len = 0;
+
+    if (quote_as_string) {
+        // Add space for two quotes
+        len += 2;
+    }
+
+    len += strlen(f->name);
+
+    // Show indicator for file types
+    if (indicator_style != none) {
+        len++;
+    }
+
+    return len;
 }
 
 // int main(int argc, char* argv[]) {
