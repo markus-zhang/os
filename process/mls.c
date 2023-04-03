@@ -319,6 +319,7 @@ main(int argc, char* argv[]) {
 
     struct pending* walker = NULL;
     while(pending_dirs) {
+        printf("Pending DIRs: %s\n", pending_dirs->name);
         walker = pending_dirs;
         pending_dirs = pending_dirs->next;
         print_dir(walker->name, walker->realname);
@@ -525,6 +526,9 @@ gobble_file(char* name, bool explicit_arg) {
     // which is default to block size of 512B
     int blocks = files[files_index].stat.st_blocks;
     files[files_index].name = strndup(name, strlen(name) + 1);
+    // debug
+    // printf("gobble_file(): file name: %s\n", files[files_index].name);
+    files_index++;
 
     return blocks;
 }
@@ -1013,6 +1017,8 @@ print_dir(char* name, char* realname) {
     while ((next = readdir(reading)) != NULL) {
         gobble_file(next->d_name, 0);
     }
+
+    printf("%s: gobble_file() completed: %d files_index\n", __func__, files_index);
 
     if (closedir(reading)) {
         fprintf(stderr, "closedir() failed: %s\n", __func__);
