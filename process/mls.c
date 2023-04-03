@@ -165,6 +165,10 @@ enum permission {
 /* -n switch: print user and group id instead of names */
 bool numeric_users;
 
+/* Nonzero means print each directory name before listing it. */
+
+bool print_dir_name;
+
 /* non-main functions declaration */
 int32_t decode_switches(int argc, char** argv);
 void usage();
@@ -176,6 +180,7 @@ void queue_directory (char* name, char* realname);
 void extract_dirs_from_files (char* dirname, int recursive);
 bool is_not_dot_or_dotdot(char* name);
 void print_current_files();
+void print_dir(char* name, char* realname);
 int length_of_file_name_and_frills(struct file* f);
 void print_type_indicator(unsigned int mode);
 void print_file_name_and_frills(struct file* f);
@@ -209,6 +214,7 @@ main(int argc, char* argv[]) {
     qmark_funny_chars = true;
     line_length = 80;   // default on 80 characters per line
     numeric_users = false;
+    print_dir_name = true;
 
     #ifdef TIOCGWINSZ
     {
@@ -311,8 +317,18 @@ main(int argc, char* argv[]) {
         print_current_files();
     }
 
+    struct pending* walker = NULL;
     while(pending_dirs) {
-        
+        walker = pending_dirs;
+        pending_dirs = pending_dirs->next;
+        print_dir(walker->name, walker->realname);
+        free(walker->name);
+        if (walker->realname) {
+            free(walker->realname);
+        }
+        free(walker);
+        // why? I don't understand, just copied
+        // print_dir_name = true;
     }
 
     return EXIT_SUCCESS;
@@ -975,6 +991,54 @@ length_of_file_name_and_frills(struct file* f) {
     }
 
     return len;
+}
+
+/*
+    This is the meat: printing all files under the directory
+    The naming of the function is a bit misleading
+    as I thought it has seomthing to do with directories, not files
+*/
+void 
+print_dir(char* name, char* realname) {
+    DIR* reading;
+    struct dirent* next;
+
+    if ((reading = opendir(name)) == NULL) {
+        fprintf(stderr, "opendir() failed: %s\n", __func__);
+        exit(EXIT_FAILURE);
+    }
+
+    clear_files();
+
+    while ((next = readdir(reading)) != NULL) {
+        gobble_file(next->d_name, 0);
+    }
+
+    if (closedir(reading)) {
+        fprintf(stderr, "closedir() failed: %s\n", __func__);
+        exit(EXIT_FAILURE);
+    }
+
+    // TODO: implement sort_files()
+    // sort_files()
+
+    if (print_dir_name) {
+        if (realname) {
+            printf("%s:\n", realname);
+        }
+        else {
+            printf("%s:\n", name);
+        }
+    }
+
+    if (files_index) {
+        print_current_files();
+    }
+
+    if (pending_dirs) {
+        putchar('\n');
+    }
+
 }
 
 // int main(int argc, char* argv[]) {
