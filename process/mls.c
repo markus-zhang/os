@@ -193,7 +193,7 @@ char* get_three_permission_chars(enum permission p);
 
 int 
 main(int argc, char* argv[]) {
-    int32_t i;
+    int32_t i = 0;
 
     /* 
         Initialize global variables;
@@ -231,7 +231,7 @@ main(int argc, char* argv[]) {
     i = decode_switches(argc, argv);
 
     // ------- DEBUG
-    printf("i is %d, argc is %d\n", i, argc);
+    // printf("i is %d, argc is %d\n", i, argc);
 
     /* Initialize array of file */
     nfiles = 0x100;
@@ -447,9 +447,13 @@ usage() {
 void 
 clear_files() {
     for (int i = 0; i < nfiles; i++) {
-        free(files[i].name);
+        if (files[i].name) {
+            free(files[i].name);
+        }
         files[i].name = NULL;
-        free(files[i].link_name);
+        if (files[i].link_name) {
+            free(files[i].link_name);
+        }
         files[i].link_name = NULL;
     }
     files_index = 0;
@@ -469,6 +473,8 @@ gobble_file(char* name, bool explicit_arg) {
     }
 
     if (stat(name, &(files[files_index].stat)) == -1) {
+        // FIXME: OK for . and .., but immediately failed for loop19
+        // Argument: /dev
         perror("stat failed");
         exit(EXIT_FAILURE);
     }
@@ -1012,7 +1018,7 @@ print_dir(char* name, char* realname) {
         exit(EXIT_FAILURE);
     }
 
-    clear_files();
+    // clear_files();
 
     while ((next = readdir(reading)) != NULL) {
         gobble_file(next->d_name, 0);
@@ -1046,65 +1052,3 @@ print_dir(char* name, char* realname) {
     }
 
 }
-
-// int main(int argc, char* argv[]) {
-//     /*
-//         TODO: Summarize the functionality of this function
-//         https://stackoverflow.com/questions/4204666/how-to-list-files-in-a-directory-in-a-c-program
-//     */
-    
-//     // TODO: implement some flags for ls
-//     DIR* d;
-//     struct dirent* dir;
-//     d = opendir(".");
-//     int32_t fileCount = 0;
-//     if (d) {
-//         while ((dir = readdir(d)) != NULL) {
-//             if (dir->d_type == DT_REG) {
-//                 fileCount++;
-//             }
-//         }
-//         // Now load all filenames into an array
-//         // First rewind to beginning of folder
-//         rewinddir(d);
-//         char** filename = malloc(fileCount * sizeof(char*));
-//         fileCount = 0;
-//         while ((dir = readdir(d)) != NULL) {
-//             if (dir->d_type == DT_REG) {
-//                 int len = strlen(dir->d_name) + 1;
-//                 char* n = malloc(len + 1);
-//                 strncpy(n, dir->d_name, len);
-
-//                 filename[fileCount] = n;
-//                 fileCount++;
-//             }
-//         }
-//         // Insertion sort, use strcasecmp() to compare
-//         // First compare 1 with 0, obtain a stable 0~1
-//         // Next compare 2 with 0~1, obtain a stable 0~2
-//         // ...until compare n-1 with 0~n-2, obtain a stable 0~n-1, done
-//         int32_t next = 1;
-//         while (next < fileCount) {
-//             int32_t walker = next;
-//             while (walker > 0 && strcasecmp(filename[walker - 1], filename[walker]) > 0) {
-//                 char* temp = filename[walker];
-//                 filename[walker] = filename[walker - 1];
-//                 filename[walker - 1] = temp;
-//                 walker--;
-//             }
-//             next++;
-//         }
-//         // test print
-//         for (int i = 0; i < fileCount; i++) {
-//             printf("%s  ", filename[i]);
-//         }
-//         printf("\n");
-//         // Clean up
-//         for (int i = 0; i < fileCount; i++) {
-//             free(filename[i]);
-//         }
-//         free(filename);
-//         closedir(d);
-//     }
-//     return EXIT_SUCCESS;
-// }
