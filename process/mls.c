@@ -173,7 +173,8 @@ bool print_dir_name;
 int32_t decode_switches(int argc, char** argv);
 void usage();
 void clear_files();
-int gobble_file(char* name, bool explicit_arg);
+int gobble_file(char* name, bool explicit_arg, char* dirname);
+void make_full_path(char* path, char* dirname, char* name);
 void get_link_name(char* filename, struct file* f);
 char* make_link_path(char* path, char* linkname);
 void queue_directory (char* name, char* realname);
@@ -460,21 +461,36 @@ clear_files() {
 }
 
 int 
-gobble_file(char* name, bool explicit_arg) {
+gobble_file(char* name, bool explicit_arg, char* dirname) {
     // gobble_file runs inside a loop and each loop consumes a new filename.
     // Potentially the # of files can reach files_index,
     // and we will have to realloc the array.
     // We follow the simple strategy of doubling the space of the array
     // everytime the array reaches nfiles
 
+    char* path = NULL;
+
     if (files_index == nfiles) {
         nfiles *= 2;
         files = realloc(files, nfiles * sizeof(struct file));
     }
 
-    if (stat(name, &(files[files_index].stat)) == -1) {
+    if (explicit_arg) {
+        if (dirname[0] == 0) {
+            // Don't have a directory name
+            path = name;
+        }
+        else {
+            path = malloc(strlen(name) + strlen(dirname) + 2);
+            make_full_path(path, dirname, name);
+        }
+    }
+
+    int errno = stat(path, &(files[files_index].stat));
+    if (errno == -1) {
         // FIXME: OK for . and .., but immediately failed for loop19
         // Argument: /dev
+        // TODO: OK I got it, loop19 doesn't exist, should be /dev/loop19
         perror("stat failed");
         exit(EXIT_FAILURE);
     }
@@ -537,6 +553,11 @@ gobble_file(char* name, bool explicit_arg) {
     files_index++;
 
     return blocks;
+}
+
+void
+make_full_path(char* path, char* dirname, char* name) {
+
 }
 
 void 
