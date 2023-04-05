@@ -1910,7 +1910,7 @@ attach (dest, dirname, name)
   *dest = 0;
 }
 
-void
+void 
 usage ()
 {
   fprintf (stderr, "\

@@ -557,7 +557,25 @@ gobble_file(char* name, bool explicit_arg, char* dirname) {
 
 void
 make_full_path(char* path, char* dirname, char* name) {
+    char* dirnamep = dirname;
 
+    /* No need to copy dirname if dirname is '.' or empty */
+    if (dirname[0] == '.' && dirname[1] == 0) {
+        path = name;
+    }
+    else {
+        while (*dirname) {
+            *path++ = *dirname++;
+        }
+        /* Do we need an extra '/' between dirname and name? */
+        if (dirname[-1] != '/') {
+            *path++ = '/';
+        }
+        while (*name) {
+            *path++ = *name++;
+        }
+        *path = '\0';
+    }
 }
 
 void 
