@@ -677,33 +677,34 @@ is_not_dot_or_dotdot(char* name) {
 
 void
 print_current_files() {
-    // switch(format) {
-    //     case one_per_line:
-    //         for (int i = 0; i < files_index; i++) {
-    //             /* Directly using pointer arithmetric */
-    //             print_file_name_and_frills(files + i);
-    //             putchar('\n');
-    //         }
-    //         break;
-    //     case with_commas:
-    //         print_with_commas();
-    //         break;
-    //     /* long format is the -l switch, thus one file per line */
-    //     case long_format:
-    //         for (int i = 0; i < files_index; i++) {
-    //             print_long_format(&files[i]);
-    //             putchar('\n');
-    //         }
-    //         break;
-    //     case many_per_line:
-    //         // TODO: implement this properly
-    //         print_with_commas();
-    //         break;
-    // }
-    for (int i = 0; i < files_index; i++) {
-        print_long_format(&files[i]);
-        putchar('\n');
+    switch(format) {
+        case one_per_line:
+            for (int i = 0; i < files_index; i++) {
+                /* Directly using pointer arithmetric */
+                print_file_name_and_frills(files + i);
+                putchar('\n');
+            }
+            break;
+        case with_commas:
+            print_with_commas();
+            break;
+        /* long format is the -l switch, thus one file per line */
+        case long_format:
+            for (int i = 0; i < files_index; i++) {
+                print_long_format(&files[i]);
+                putchar('\n');
+            }
+            break;
+        case many_per_line:
+            // TODO: implement this properly
+            printf("print many per line\n");
+            print_with_commas();
+            break;
     }
+    // for (int i = 0; i < files_index; i++) {
+    //     print_long_format(&files[i]);
+    //     putchar('\n');
+    // }
 }
 
 void 
@@ -821,10 +822,12 @@ print_with_commas() {
             putchar('\n');
             cur_next -= cur;
         }
+        print_file_name_and_frills(&files[i]);
         if (i + 1 < files_index) {
             printf(", ");
         }
     }
+    putchar('\n');
 }
 
 void 
