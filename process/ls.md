@@ -58,7 +58,7 @@ I have learned a lot so far since reading the source code of the 1991 version of
 
 #### Switches
 
-1. Format: should only support short format (default: multiple in one line), one per line (`-1`) and long format (`-l`)
+1. Format: should only support short format (default: multiple in one line), one per line (`-1`) and long format (`-l`). Added: also support with_commas (`-m`)
    1. For short format, we need to consider all other format modifiers before writing the whole line. For example, what if user enables indicator? what if user wants quotation marks for each file? 
 2. Indicator: Does the program show extra char for each file? (`-F`)
 3. `-A` for including fies starting with `.` and `-a` to further include `.` and `..`
@@ -73,6 +73,65 @@ We can probably re-use a lot of the code and even patterns in the original exper
 
 ```c
 int main(int argc, char* argv[]) {
+    // set default values for all switches
+
+    // decode switches to set them to proper values based on argv
+    // it's smart to return total argv elements read (i)
+
+    // initialize files
+
+    // use i to figure out whether we have parsed all argv elements
+
+    /*
+        if we have parsed all argv elements: {
+            // then we are printing the current work directory . 
+            if we only print directory name: {
+                gobble cwd only
+            }
+            else {
+                gobble all files under cwd, including . and ..
+            }
+        }
+        else {
+            for (; i < argc; i++) {
+                switch (file type) {
+                    case (regular file):
+                        gobble file
+                        break
+                    case (directory):
+                        if (only print dir name):
+                            gobble dir only
+                        else:
+                            gobble all files under dir, including . and ..
+                        break;
+                    case (symbolic link):
+                        if (show pointed object):
+                            if (pointed object is dir):
+                                if (only print dir name):
+                                    gobble dir only
+                                else:
+                                    gobble all files under dir, including . and ..
+                            else:
+                                gobble pointed object
+                        else:
+                            gobble file
+                        break;
+                    default:
+                        break;
+                }
+            }   
+        }
+
+        for each file in files:
+            print_file(file)
+    */
+
+    /*
+        print_file(file) {
+            
+        }
+    */
+
     
 }
 ```

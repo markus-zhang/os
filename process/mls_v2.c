@@ -42,7 +42,7 @@ struct file {
 
 };
 
-/* Do we trace links to pointed object or not? */
+/* Do we trace links to pointed object or not? -L switch */
 
 bool trace_links;
 
@@ -74,7 +74,7 @@ struct pending {
 
 struct pending *pending_dirs;
 
-/* If true then show directory name instead of contents */
+/* If true then show directory name instead of contents. -d switch */
 
 bool immediate_dirs;
 
@@ -231,9 +231,6 @@ main(int argc, char* argv[]) {
 
     i = decode_switches(argc, argv);
 
-    // ------- DEBUG
-    // printf("i is %d, argc is %d\n", i, argc);
-
     /* Initialize array of file */
     nfiles = 0x100;
     files = malloc(nfiles * sizeof(struct file));
@@ -267,6 +264,9 @@ main(int argc, char* argv[]) {
     // when i == argc, dir_defaulted = true, we are basically showing .
     // if immediate_dirs is true, we just show ., not the contents (pretty dumb TBH)
 
+    // TODO: Force immediate_dirs to be true, remove once tested
+    immediate_dirs = true;
+    dir_defaulted = true;
     if (dir_defaulted) {
         if (immediate_dirs) {
             /*
@@ -284,46 +284,44 @@ main(int argc, char* argv[]) {
 
             */
         
-            gobble_file(".", 1, "");
+            gobble_file(".", true, "");
         }
         else {
-            queue_directory(".", 0);
+            // queue_directory(".", 0);
+            // gobble_directory(".");
         }
     }
 
     // If there are more than 0 file grobbed
-    if (files_index) {
-        // ----------DEBUG
-        printf("files_index: %d\n", files_index);
-        /* Let's assume we don't sort */
-        // sort_files();
-        if (!immediate_dirs) {
-            extract_dirs_from_files("", 0);
-        }
-    }
+    // if (files_index) {
+    //     // ----------DEBUG
+    //     printf("files_index: %d\n", files_index);
+    //     /* Let's assume we don't sort */
+    //     // sort_files();
+    //     if (!immediate_dirs) {
+    //         extract_dirs_from_files("", 0);
+    //     }
+    // }
 
     /* extract_dirs_from_files() may decrease files_index so check again */
     if (files_index) {
-        // ----------DEBUG
-        printf("files_index: %d\n", files_index);
-
         print_current_files();
     }
 
-    struct pending* walker = NULL;
-    while(pending_dirs) {
-        printf("Pending DIRs: %s\n", pending_dirs->name);
-        walker = pending_dirs;
-        pending_dirs = pending_dirs->next;
-        print_dir(walker->name, walker->realname);
-        free(walker->name);
-        if (walker->realname) {
-            free(walker->realname);
-        }
-        free(walker);
-        // why? I don't understand, just copied
-        // print_dir_name = true;
-    }
+    // struct pending* walker = NULL;
+    // while(pending_dirs) {
+    //     printf("Pending DIRs: %s\n", pending_dirs->name);
+    //     walker = pending_dirs;
+    //     pending_dirs = pending_dirs->next;
+    //     print_dir(walker->name, walker->realname);
+    //     free(walker->name);
+    //     if (walker->realname) {
+    //         free(walker->realname);
+    //     }
+    //     free(walker);
+    //     // why? I don't understand, just copied
+    //     // print_dir_name = true;
+    // }
 
     return EXIT_SUCCESS;
 }
@@ -454,7 +452,7 @@ clear_files() {
 
 int 
 gobble_file(char* name, bool explicit_arg, char* dirname) {
-    // gobble_file runs inside a loop and each loop consumes a new filename.
+    // gobble_file may run inside a loop and each loop consumes a new filename.
     // Potentially the # of files can reach files_index,
     // and we will have to realloc the array.
     // We follow the simple strategy of doubling the space of the array
@@ -467,21 +465,10 @@ gobble_file(char* name, bool explicit_arg, char* dirname) {
         files = realloc(files, nfiles * sizeof(struct file));
     }
 
-    if (explicit_arg) {
-        if (dirname[0] == 0) {
-            // Don't have a directory name
-            path = name;
-        }
-        else {
-            path = malloc(strlen(name) + strlen(dirname) + 2);
-            make_full_path(path, dirname, name);
-        }
-    }
+    path = name;
 
     int errno = stat(path, &(files[files_index].stat));
     if (errno == -1) {
-        // FIXME: OK for . and .., but immediately failed for loop19
-        // Argument: /dev
         // TODO: OK I got it, loop19 doesn't exist, should be /dev/loop19
         perror("stat failed");
         exit(EXIT_FAILURE);
@@ -690,28 +677,32 @@ is_not_dot_or_dotdot(char* name) {
 
 void
 print_current_files() {
-    switch(format) {
-        case one_per_line:
-            for (int i = 0; i < files_index; i++) {
-                /* Directly using pointer arithmetric */
-                print_file_name_and_frills(files + i);
-                putchar('\n');
-            }
-            break;
-        case with_commas:
-            print_with_commas();
-            break;
-        /* long format is the -l switch, thus one file per line */
-        case long_format:
-            for (int i = 0; i < files_index; i++) {
-                print_long_format(&files[i]);
-                putchar('\n');
-            }
-            break;
-        case many_per_line:
-            // TODO: implement this properly
-            print_with_commas();
-            break;
+    // switch(format) {
+    //     case one_per_line:
+    //         for (int i = 0; i < files_index; i++) {
+    //             /* Directly using pointer arithmetric */
+    //             print_file_name_and_frills(files + i);
+    //             putchar('\n');
+    //         }
+    //         break;
+    //     case with_commas:
+    //         print_with_commas();
+    //         break;
+    //     /* long format is the -l switch, thus one file per line */
+    //     case long_format:
+    //         for (int i = 0; i < files_index; i++) {
+    //             print_long_format(&files[i]);
+    //             putchar('\n');
+    //         }
+    //         break;
+    //     case many_per_line:
+    //         // TODO: implement this properly
+    //         print_with_commas();
+    //         break;
+    // }
+    for (int i = 0; i < files_index; i++) {
+        print_long_format(&files[i]);
+        putchar('\n');
     }
 }
 
