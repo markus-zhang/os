@@ -52,4 +52,27 @@ I have learned a lot so far since reading the source code of the 1991 version of
     ```
 6. How to convert a long epoch to human readable time in C?
    https://stackoverflow.com/questions/64725951/convert-long-of-unix-epoch-timestamp-to-real-date-time
-   
+
+
+### Program structure
+
+#### Switches
+
+1. Format: should only support short format (default: multiple in one line), one per line (`-1`) and long format (`-l`)
+   1. For short format, we need to consider all other format modifiers before writing the whole line. For example, what if user enables indicator? what if user wants quotation marks for each file? 
+2. Indicator: Does the program show extra char for each file? (`-F`)
+3. `-A` for including fies starting with `.` and `-a` to further include `.` and `..`
+4. `-Q` to put `"` between file names
+5. For long format, if print user id and group id instead of names, use `-n`
+6. For directories, `-d` (immediate_dirs) prints info about the directory ONLY instead of going into the directory and print everything inside
+7. For symbolic links, `-L` shows info of the object pointed by the symblic link
+
+#### Pseudo code
+
+We can probably re-use a lot of the code and even patterns in the original experiment project.
+
+```c
+int main(int argc, char* argv[]) {
+    
+}
+```

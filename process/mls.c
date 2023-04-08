@@ -261,7 +261,7 @@ main(int argc, char* argv[]) {
 
     for (; i < argc; i++) {
         // explicit_arg set to true as user explicitly gives args
-        gobble_file(argv[i], true);
+        gobble_file(argv[i], true, "");
     }
 
     // when i == argc, dir_defaulted = true, we are basically showing .
@@ -292,7 +292,7 @@ main(int argc, char* argv[]) {
 
             */
         
-            gobble_file(".", 1);
+            gobble_file(".", 1, "");
         }
         else {
             queue_directory(".", 0);
@@ -557,7 +557,6 @@ gobble_file(char* name, bool explicit_arg, char* dirname) {
 
 void
 make_full_path(char* path, char* dirname, char* name) {
-    char* dirnamep = dirname;
 
     /* No need to copy dirname if dirname is '.' or empty */
     if (dirname[0] == '.' && dirname[1] == 0) {
@@ -1060,7 +1059,7 @@ print_dir(char* name, char* realname) {
     // clear_files();
 
     while ((next = readdir(reading)) != NULL) {
-        gobble_file(next->d_name, 0);
+        gobble_file(next->d_name, 0, name);
     }
 
     printf("%s: gobble_file() completed: %d files_index\n", __func__, files_index);
