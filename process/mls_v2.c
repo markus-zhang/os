@@ -265,8 +265,8 @@ main(int argc, char* argv[]) {
     // if immediate_dirs is true, we just show ., not the contents (pretty dumb TBH)
 
     // TODO: Force immediate_dirs to be true, remove once tested
-    immediate_dirs = true;
-    dir_defaulted = true;
+    // immediate_dirs = false;
+    // dir_defaulted = true;
     if (dir_defaulted) {
         if (immediate_dirs) {
             /*
@@ -287,41 +287,41 @@ main(int argc, char* argv[]) {
             gobble_file(".", true, "");
         }
         else {
-            // queue_directory(".", 0);
+            queue_directory(".", 0);
             // gobble_directory(".");
         }
     }
 
     // If there are more than 0 file grobbed
-    // if (files_index) {
-    //     // ----------DEBUG
-    //     printf("files_index: %d\n", files_index);
-    //     /* Let's assume we don't sort */
-    //     // sort_files();
-    //     if (!immediate_dirs) {
-    //         extract_dirs_from_files("", 0);
-    //     }
-    // }
+    if (files_index) {
+        // ----------DEBUG
+        printf("files_index: %d\n", files_index);
+        /* Let's assume we don't sort */
+        // sort_files();
+        if (!immediate_dirs) {
+            extract_dirs_from_files("", 0);
+        }
+    }
 
     /* extract_dirs_from_files() may decrease files_index so check again */
     if (files_index) {
         print_current_files();
     }
 
-    // struct pending* walker = NULL;
-    // while(pending_dirs) {
-    //     printf("Pending DIRs: %s\n", pending_dirs->name);
-    //     walker = pending_dirs;
-    //     pending_dirs = pending_dirs->next;
-    //     print_dir(walker->name, walker->realname);
-    //     free(walker->name);
-    //     if (walker->realname) {
-    //         free(walker->realname);
-    //     }
-    //     free(walker);
-    //     // why? I don't understand, just copied
-    //     // print_dir_name = true;
-    // }
+    struct pending* walker = NULL;
+    while(pending_dirs) {
+        printf("Pending DIRs: %s\n", pending_dirs->name);
+        walker = pending_dirs;
+        pending_dirs = pending_dirs->next;
+        print_dir(walker->name, walker->realname);
+        free(walker->name);
+        if (walker->realname) {
+            free(walker->realname);
+        }
+        free(walker);
+        // why? I don't understand, just copied
+        // print_dir_name = true;
+    }
 
     return EXIT_SUCCESS;
 }
@@ -465,7 +465,8 @@ gobble_file(char* name, bool explicit_arg, char* dirname) {
         files = realloc(files, nfiles * sizeof(struct file));
     }
 
-    path = name;
+    path = malloc(strlen(name) + strlen(dirname) + 2);
+    make_full_path(path, dirname, name);
 
     int errno = stat(path, &(files[files_index].stat));
     if (errno == -1) {
@@ -484,17 +485,17 @@ gobble_file(char* name, bool explicit_arg, char* dirname) {
 
     if (trace_links) {
         // We first use stat() and assume the link is valid
-        if (stat(name, &(files[files_index].stat)) != 0) {
+        if (stat(path, &(files[files_index].stat)) != 0) {
             // Then if it fails we switch to lstat()
-            if (lstat(name, &(files[files_index].stat)) != 0) {
+            if (lstat(path, &(files[files_index].stat)) != 0) {
                 fprintf(stderr, "lstat() failed in %s\n", __func__);
             }
         }
     }
     else {
         // Since we don't care about pointed object, just use lstat()
-        if (lstat(name, &(files[files_index].stat)) != 0) {
-            fprintf(stderr, "lstat() failed in %s\n", __func__);
+        if (lstat(path, &(files[files_index].stat)) != 0) {
+            fprintf(stderr, "lstat() failed in %s for %s\n", __func__, name);
         }
     }
 
@@ -502,7 +503,7 @@ gobble_file(char* name, bool explicit_arg, char* dirname) {
     // S_ISLNK() returns true if file is
     #ifdef S_ISLNK
     if (S_ISLNK(files[files_index].stat.st_mode)) {
-        get_link_name(name, &files[files_index]);
+        get_link_name(path, &files[files_index]);
         // Let's ignore make_link_path first
         make_link_path(NULL, NULL);
         files[files_index].filetype = symbolic_link;
@@ -554,7 +555,6 @@ make_full_path(char* path, char* dirname, char* name) {
         }
         *path = '\0';
     }
-    printf("Full path: %s\n", path);
 }
 
 void 
@@ -573,7 +573,7 @@ get_link_name(char* filename, struct file* f) {
         f->link_name = linkbuffer;
     }
     else {
-        fprintf(stderr, "readlink() error: %s\n", __func__);
+        fprintf(stderr, "readlink() error: %s for file %s\n", __func__, filename);
         free(linkbuffer);
         linkbuffer = NULL;
         exit(EXIT_FAILURE);
@@ -637,17 +637,11 @@ extract_dirs_from_files (char* dirname, int recursive) {
      order.  */
 
     for (int i = files_index - 1; i >= 0; i--) {
-        if ((files[i].filetype == directory || files[i].filetype == arg_directory)
-            && (!recursive || is_not_dot_or_dotdot(files[i].name))) {
+        if (files[i].filetype == directory || files[i].filetype == arg_directory) {
             if (files[i].name[0] == '/' || dirname[0] == 0) {
                 queue_directory(files[i].name, files[i].link_name);
             }
-            else {
-                // No idea what this part does so ignore first
-            }
-            if (files[i].filetype == arg_directory) {
-                free(files[i].name);
-            }
+            // free(files[i].name);
         }
     }
 
@@ -657,7 +651,7 @@ extract_dirs_from_files (char* dirname, int recursive) {
     int j = 0;
     
     for (; i < files_index; i++) {
-        if (files[i].filetype != arg_directory) {
+        if (files[i].filetype != arg_directory || files[i].filetype != directory) {
             files[j++] = files[i];
         }
     }

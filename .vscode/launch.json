@@ -8,7 +8,7 @@
         "name": "(gdb) Launch",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceRoot}/process/mls",
+        "program": "${workspaceRoot}/process/mls_v2",
         "cwd": "${workspaceRoot}/process",
         "args": ["/dev"],
         "MIMode": "gdb",
