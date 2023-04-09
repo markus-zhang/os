@@ -350,7 +350,7 @@ decode_switches(int argc, char** argv) {
     /* set default value of format to many_per_line */
     format = many_per_line;
     
-    while ((c = getopt_long(argc, argv, "abdlmnqrtwAFLSUX1", long_options, NULL)) != EOF) {
+    while ((c = getopt_long(argc, argv, "abdlmnqrtwAFLQSUX1", long_options, NULL)) != EOF) {
         switch (c) {
             case 'a':
                 all_files = true;
@@ -393,6 +393,9 @@ decode_switches(int argc, char** argv) {
                 break;
             case 'L':
                 trace_links = true;
+                break;
+            case 'Q':
+                quote_as_string = true;
                 break;
             case 'S':
                 sort_type = sort_size;
@@ -693,10 +696,6 @@ print_current_files() {
             print_with_commas();
             break;
     }
-    // for (int i = 0; i < files_index; i++) {
-    //     print_long_format(&files[i]);
-    //     putchar('\n');
-    // }
 }
 
 void 
@@ -960,7 +959,8 @@ print_long_format(struct file* f) {
     printf("%s ", time_human_readable);
 
     /* filename, for symbolic links print its link_name. Print file indicator char if needed */
-    printf("%s", f->name);
+    // printf("%s", f->name);
+    print_name_with_quoting(f->name);
 
     if (f->filetype == symbolic_link) {
         if (f->link_name) {
