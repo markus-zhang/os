@@ -294,8 +294,6 @@ main(int argc, char* argv[]) {
 
     // If there are more than 0 file grobbed
     if (files_index) {
-        // ----------DEBUG
-        printf("files_index: %d\n", files_index);
         /* Let's assume we don't sort */
         // sort_files();
         if (!immediate_dirs) {
