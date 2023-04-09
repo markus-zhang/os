@@ -24,8 +24,8 @@
 #define PATH_INITIAL_SIZE       64
 #define PATH_INCREMENT_SIZE     16
 #define CWD_LEN                 256
-#define ARGV_INITIAL_SIZE       64
-#define ARGV_INCREMENT_SIZE     16
+#define ARGS_INITIAL_SIZE       64
+#define ARGS_INCREMENT_SIZE     16
 
 int32_t init_path();
 int32_t inspect_path();
@@ -47,7 +47,8 @@ int32_t _internal_ls();
 char*       cwd;
 char**      path;
 int32_t     pathCount;
-char*       argv[ARGV_INITIAL_SIZE];
+char**      args;
+int32_t     status;
 
 int main(int argc, char* argv[]) {
     // Initiate CWD
@@ -67,15 +68,13 @@ int main(int argc, char* argv[]) {
     }
 
     // Initiate ARGV
-    for (int i = 0; i < ARGV_INITIAL_SIZE; i++) {
-        argv[i] = NULL;
-    }
+    args = malloc(ARGS_INITIAL_SIZE * sizeof(char*));
 
     while(RUNNING) {
         fprintf(stdout, ">");
-        char* input = NULL;
+        char* line = NULL;
         size_t size;
-        if (getline(&input, &size, stdin) == -1) {
+        if (getline(&line, &size, stdin) == -1) {
             fprintf(stderr, "getline() error\n");
         }
         /*
@@ -83,7 +82,8 @@ int main(int argc, char* argv[]) {
             - built-in command:
                 - ls: list all files and directories under cwd
         */
-        process_command(input);
+        args = mash_split_line(line);
+        status = mash_execute(args);
     }
 
     // shut down

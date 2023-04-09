@@ -751,9 +751,11 @@ print_type_indicator(unsigned int mode) {
         putchar('|');
     }
 
+    #ifdef S_ISSOCK
     if (S_ISSOCK(mode)) {
         putchar('=');
     }
+    #endif
 
     /*
         Here's how the expression evaluates step by step:
