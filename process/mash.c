@@ -34,7 +34,9 @@ int32_t remove_path(const char* oldPath);
 int32_t process_command(char* command);
 int32_t _internal_ls();
 
-/*
+char** mash_split_line(char* line);
+
+/*!
     Global variables
     - cwd: current working directory
         - type: C string
@@ -49,6 +51,7 @@ char**      path;
 int32_t     pathCount;
 char**      args;
 int32_t     status;
+char*       line;
 
 int main(int argc, char* argv[]) {
     // Initiate CWD
@@ -68,20 +71,31 @@ int main(int argc, char* argv[]) {
     }
 
     // Initiate ARGV
+    line = NULL;
     args = malloc(ARGS_INITIAL_SIZE * sizeof(char*));
+    status = 1;
 
-    while(RUNNING) {
+    while(status) {
         fprintf(stdout, ">");
-        char* line = NULL;
         size_t size;
         if (getline(&line, &size, stdin) == -1) {
-            fprintf(stderr, "getline() error\n");
+            if (feof(stdin)) {
+                // Ctrl-D (EOF)
+                printf("Terminated by user, bye!\n");
+                exit(EXIT_SUCCESS);
+            }
+            fprintf(stderr, "getline() error in %s\n", __func__);
+            exit(EXIT_FAILURE);
         }
-        /*
-            Process user input
-            - built-in command:
-                - ls: list all files and directories under cwd
-        */
+        /**
+         * @brief Process user input
+         *  - built-int command:
+         *      - exit: call `exit` system call with 0 as a parameter
+         *      - cd: always take one arg. Use `chdir()` system call
+         *      - path: takes >= 0 args, each separated by space, added to search path of the shell
+         * 
+         */
+
         args = mash_split_line(line);
         status = mash_execute(args);
     }
@@ -93,6 +107,8 @@ int main(int argc, char* argv[]) {
         free(path);
         path = NULL;
     }
+    free(line);
+    free(args);
     exit(EXIT_SUCCESS);
 }
 
@@ -227,6 +243,62 @@ int32_t process_command(char* command) {
     }
     
     return EXIT_SUCCESS;
+}
+
+/**
+ * @brief split line into tokens: 
+ *      1) quote pairs define one token
+ *      2) escape char ('\') needs to be considered
+ * 
+ * @param line 
+ * @return char** 
+ */
+char** 
+mash_split_line(char* line) {
+    int len = strlen(line);
+    enum parsestat {
+        ready = 0,
+        token_begin,
+        token_end,
+        in_string,
+        is_escaped
+    };
+
+    enum parsestat stat = ready;
+    int tokenstart = 0;
+    int tokenend = 0;
+    bool tokenquoted = false;
+
+    for (int i = 0; i < len; i++) {
+        if (line[i] != ' ' && line[i] != '\\' && line[i] != '"') {
+            if (stat == ready) {
+                stat = token_begin;
+                tokenstart = i;
+            }
+            else if (stat == token_begin) {
+                // Do nothing, already started parsing a token
+            }
+            else if (stat == token_end) {
+                // Should be error, if not parsing must be ready
+                fprintf(stderr, "Wrong parsing status at index %d: %c\n", i, line[i]);
+                exit(EXIT_FAILURE);
+            }
+            else if (stat == in_string) {
+                // Do nothing, already in a string so must be parsing a token
+            }
+            else if (stat == is_escaped) {
+                // Do nothing, quoted flag is already set to true by a previous quote
+            }
+        }
+        else if (line[i] == ' ') {
+            // If ready, do nothing; If already parsing, set tokenend (if in string then stat is in_string)
+            // If in string, do nothing; if is_escaped, do nothing
+            if (stat == token_begin && !tokenquoted) {
+                tokenend = i - 1;
+                
+            }
+        }
+    }
 }
 
 int32_t _internal_ls() {
