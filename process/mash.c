@@ -50,6 +50,7 @@ char*       cwd;
 char**      path;
 int32_t     pathCount;
 char**      args;
+int32_t     argsindex;
 int32_t     status;
 char*       line;
 
@@ -255,10 +256,12 @@ int32_t process_command(char* command) {
  */
 char** 
 mash_split_line(char* line) {
+    argsindex = 0;
     int len = strlen(line);
     enum parsestat {
         ready = 0,
         token_begin,
+        // TODO: we probably don't need token_end
         token_end,
         in_string,
         is_escaped
@@ -295,6 +298,30 @@ mash_split_line(char* line) {
             // If in string, do nothing; if is_escaped, do nothing
             if (stat == token_begin && !tokenquoted) {
                 tokenend = i - 1;
+                char* token = malloc(tokenend - tokenstart + 2);
+                for (int j = tokenstart; j <= tokenend; j++) {
+                    token[j - tokenstart] = line[j];
+                }
+                token[-1] = '\0';
+                args[argsindex] = token;
+                argsindex++;
+                stat = ready;
+            }
+            else if (stat == ready) {
+                // Do nothing
+            }
+            else if (stat == token_end) {
+                // Do nothing
+            }
+            else if (stat == in_string) {
+                // Do nothing, still in string
+            }
+            else if (stat == is_escaped) {
+                // Do nothing (actually doesn't make sense as escaping char must follow '," or \)
+            }
+        }
+        else if (line[i] == '"') {
+            if (stat == ready) {
                 
             }
         }
