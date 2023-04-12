@@ -33,6 +33,7 @@ int32_t add_path(const char* newPath);
 int32_t remove_path(const char* oldPath);
 int32_t process_command(char* command);
 int32_t _internal_ls();
+void print_args();
 
 char** mash_split_line(char* line);
 
@@ -98,6 +99,7 @@ int main(int argc, char* argv[]) {
          */
 
         args = mash_split_line(line);
+        print_args();
         status = mash_execute(args);
     }
 
@@ -249,7 +251,6 @@ int32_t process_command(char* command) {
 /**
  * @brief split line into tokens: 
  *      1) quote pairs define one token
- *      2) escape char ('\') needs to be considered
  * 
  * @param line 
  * @return char** 
@@ -262,18 +263,16 @@ mash_split_line(char* line) {
         ready = 0,
         token_begin,
         // TODO: we probably don't need token_end
-        token_end,
-        in_string,
-        is_escaped
+        in_string
     };
 
     enum parsestat stat = ready;
     int tokenstart = 0;
     int tokenend = 0;
-    bool tokenquoted = false;
 
-    for (int i = 0; i < len; i++) {
-        if (line[i] != ' ' && line[i] != '\\' && line[i] != '"') {
+    // loop stops at [len-2] to get rid of linebreak
+    for (int i = 0; i < len - 1; i++) {
+        if (line[i] != ' ' && line[i] != '"') {
             if (stat == ready) {
                 stat = token_begin;
                 tokenstart = i;
@@ -281,22 +280,11 @@ mash_split_line(char* line) {
             else if (stat == token_begin) {
                 // Do nothing, already started parsing a token
             }
-            else if (stat == token_end) {
-                // Should be error, if not parsing must be ready
-                fprintf(stderr, "Wrong parsing status at index %d: %c\n", i, line[i]);
-                exit(EXIT_FAILURE);
-            }
-            else if (stat == in_string) {
-                // Do nothing, already in a string so must be parsing a token
-            }
-            else if (stat == is_escaped) {
-                // Do nothing, quoted flag is already set to true by a previous quote
-            }
         }
         else if (line[i] == ' ') {
             // If ready, do nothing; If already parsing, set tokenend (if in string then stat is in_string)
             // If in string, do nothing; if is_escaped, do nothing
-            if (stat == token_begin && !tokenquoted) {
+            if (stat == token_begin) {
                 tokenend = i - 1;
                 char* token = malloc(tokenend - tokenstart + 2);
                 for (int j = tokenstart; j <= tokenend; j++) {
@@ -307,24 +295,48 @@ mash_split_line(char* line) {
                 argsindex++;
                 stat = ready;
             }
-            else if (stat == ready) {
-                // Do nothing
-            }
-            else if (stat == token_end) {
-                // Do nothing
-            }
-            else if (stat == in_string) {
-                // Do nothing, still in string
-            }
-            else if (stat == is_escaped) {
-                // Do nothing (actually doesn't make sense as escaping char must follow '," or \)
-            }
         }
         else if (line[i] == '"') {
             if (stat == ready) {
-                
+                if (line[i+1] != '\0') {
+                    tokenstart = i + 1;
+                    stat = in_string;
+                }
+                else {
+                    fprintf(stderr, "Wrong parsing status at index %d: %c\n", i, line[i]);
+                    exit(EXIT_FAILURE);
+                }
+            }
+            else if (stat == in_string) {
+                // OK we are out
+                tokenend = i - 1;
+                char* token = malloc(tokenend - tokenstart + 2);
+                for (int j = tokenstart; j <= tokenend; j++) {
+                    token[j - tokenstart] = line[j];
+                }
+                token[-1] = '\0';
+                args[argsindex] = token;
+                argsindex++;
+                stat = ready;
             }
         }
+        else if (line[i] == '\\') {
+            // Only works if in string, no args should contain '\'
+            if (stat == in_string) {
+
+            }
+            else {
+                fprintf(stderr, "Wrong parsing status (no escaping char outside of string) at index %d: %c\n", i, line[i]);
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+}
+
+void
+print_args() {
+    for (int i = 0; i < argsindex; i++) {
+        printf("%s\n", args[i]);
     }
 }
 
