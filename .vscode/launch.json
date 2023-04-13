@@ -8,9 +8,9 @@
         "name": "(gdb) Launch",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceRoot}/process/mls_v2",
+        "program": "${workspaceRoot}/process/mash",
         "cwd": "${workspaceRoot}/process",
-        "args": ["/dev"],
+        // "args": ["/dev"],
         "MIMode": "gdb",
         "setupCommands": [
             {

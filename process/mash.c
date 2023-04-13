@@ -35,7 +35,8 @@ int32_t process_command(char* command);
 int32_t _internal_ls();
 void print_args();
 
-char** mash_split_line(char* line);
+void mash_split_line(char* line);
+int mash_execute(char** args);
 
 /*!
     Global variables
@@ -98,20 +99,21 @@ int main(int argc, char* argv[]) {
          * 
          */
 
-        args = mash_split_line(line);
+        mash_split_line(line);
         print_args();
         status = mash_execute(args);
     }
 
     // shut down
     for (int i = 0; i < pathCount; i++) {
-        free(path[pathCount]);
-        path[pathCount] = NULL;
-        free(path);
-        path = NULL;
+        free(path[i]);
+        path[i] = NULL;
     }
+
     free(line);
-    free(args);
+    for (int i = 0; i <= argsindex; i++) {
+        free(args[i]);
+    }
     exit(EXIT_SUCCESS);
 }
 
@@ -175,10 +177,12 @@ int32_t init_path() {
             end++;
         }
     }
+    // inspect_path();
     return EXIT_SUCCESS;
 }
 
-int32_t inspect_path() {
+int32_t 
+inspect_path() {
     /*
         TODO: Summarize the functionality of this function
     */
@@ -255,14 +259,14 @@ int32_t process_command(char* command) {
  * @param line 
  * @return char** 
  */
-char** 
+void
 mash_split_line(char* line) {
-    argsindex = 0;
+    argsindex = -1;
+    // char** argswalker = args;
     int len = strlen(line);
     enum parsestat {
         ready = 0,
         token_begin,
-        // TODO: we probably don't need token_end
         in_string
     };
 
@@ -271,17 +275,14 @@ mash_split_line(char* line) {
     int tokenend = 0;
 
     // loop stops at [len-2] to get rid of linebreak
-    for (int i = 0; i < len - 1; i++) {
-        if (line[i] != ' ' && line[i] != '"') {
+    for (int i = 0; i <= len - 1; i++) {
+        if (line[i] != ' ' && line[i] != '"' && i < len - 1) {
             if (stat == ready) {
                 stat = token_begin;
                 tokenstart = i;
             }
-            else if (stat == token_begin) {
-                // Do nothing, already started parsing a token
-            }
         }
-        else if (line[i] == ' ') {
+        else if (line[i] == ' ' || i == len - 1) {
             // If ready, do nothing; If already parsing, set tokenend (if in string then stat is in_string)
             // If in string, do nothing; if is_escaped, do nothing
             if (stat == token_begin) {
@@ -291,8 +292,8 @@ mash_split_line(char* line) {
                     token[j - tokenstart] = line[j];
                 }
                 token[-1] = '\0';
-                args[argsindex] = token;
                 argsindex++;
+                args[argsindex] = token;
                 stat = ready;
             }
         }
@@ -315,29 +316,25 @@ mash_split_line(char* line) {
                     token[j - tokenstart] = line[j];
                 }
                 token[-1] = '\0';
-                args[argsindex] = token;
                 argsindex++;
+                args[argsindex] = token;
                 stat = ready;
             }
         }
-        else if (line[i] == '\\') {
-            // Only works if in string, no args should contain '\'
-            if (stat == in_string) {
-
-            }
-            else {
-                fprintf(stderr, "Wrong parsing status (no escaping char outside of string) at index %d: %c\n", i, line[i]);
-                exit(EXIT_FAILURE);
-            }
-        }
     }
+    printf("argsindex: %d\n", argsindex);
 }
 
 void
 print_args() {
-    for (int i = 0; i < argsindex; i++) {
-        printf("%s\n", args[i]);
+    for (char** walker = args; *walker != NULL; walker++) {
+        printf("%s\n", *walker);
     }
+}
+
+int
+mash_execute(char** args) {
+    return 0;
 }
 
 int32_t _internal_ls() {
