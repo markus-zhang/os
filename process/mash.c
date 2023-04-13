@@ -114,6 +114,10 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i <= argsindex; i++) {
         free(args[i]);
     }
+
+    free(cwd);
+    free(path);
+    free(args);
     exit(EXIT_SUCCESS);
 }
 
@@ -291,7 +295,7 @@ mash_split_line(char* line) {
                 for (int j = tokenstart; j <= tokenend; j++) {
                     token[j - tokenstart] = line[j];
                 }
-                token[-1] = '\0';
+                token[tokenend - tokenstart + 1] = '\0';
                 argsindex++;
                 args[argsindex] = token;
                 stat = ready;
@@ -315,7 +319,7 @@ mash_split_line(char* line) {
                 for (int j = tokenstart; j <= tokenend; j++) {
                     token[j - tokenstart] = line[j];
                 }
-                token[-1] = '\0';
+                token[tokenend - tokenstart + 1] = '\0';
                 argsindex++;
                 args[argsindex] = token;
                 stat = ready;
@@ -327,8 +331,8 @@ mash_split_line(char* line) {
 
 void
 print_args() {
-    for (char** walker = args; *walker != NULL; walker++) {
-        printf("%s\n", *walker);
+    for (int i = 0; i <= argsindex; i++) {
+        printf("%s\n", args[i]);
     }
 }
 
