@@ -338,6 +338,35 @@ print_args() {
 
 int
 mash_execute(char** args) {
+    // if args contains zero entries then do nothing
+    if (argsindex < 0) {
+        return 0;
+    }
+
+    // check if program is a built-in command
+    // we have three of them: exit, cd and path
+    char* program = args[0];
+    
+
+    return 0;
+}
+
+int 
+builtin(char* program) {
+    if (strlen(program) == 4 && strncmp(program, "exit", 4) == 0) {
+        // just exit
+        printf("Built-in command: exit\n");
+        exit(EXIT_SUCCESS);
+    }
+    else if (strlen(program) == 2 && strncmp(program, "cd", 2) == 0) {
+        if (argsindex < 1 || strlen(args[1]) <= 0) {
+            fprintf(stderr, "builtin: cd needs \n");
+            return EXIT_FAILURE;
+        }
+        else {
+            
+        }
+    }
     return 0;
 }
 
