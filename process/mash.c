@@ -34,6 +34,8 @@ int32_t remove_path(const char* oldPath);
 int32_t process_command(char* command);
 int32_t _internal_ls();
 void print_args();
+int builtin(char* program);
+void print_cd_usage();
 
 void mash_split_line(char* line);
 int mash_execute(char** args);
@@ -102,6 +104,7 @@ int main(int argc, char* argv[]) {
         mash_split_line(line);
         print_args();
         status = mash_execute(args);
+        status = 1;
     }
 
     // shut down
@@ -346,7 +349,11 @@ mash_execute(char** args) {
     // check if program is a built-in command
     // we have three of them: exit, cd and path
     char* program = args[0];
-    
+    if (builtin(program) == 2) {
+        // Not a builtin
+        printf("Not a builtin.\n");
+        return 1;
+    }
 
     return 0;
 }
@@ -359,15 +366,38 @@ builtin(char* program) {
         exit(EXIT_SUCCESS);
     }
     else if (strlen(program) == 2 && strncmp(program, "cd", 2) == 0) {
-        if (argsindex < 1 || strlen(args[1]) <= 0) {
-            fprintf(stderr, "builtin: cd needs \n");
-            return EXIT_FAILURE;
+        if (argsindex == 0) {
+            return EXIT_SUCCESS;
+        }
+        else if (argsindex >= 1 && strlen(args[1]) > 0) {
+            int n = chdir(args[1]);
+            if (n == 0) {
+                char* buf = malloc(256);
+                if (getcwd(buf, 256) == NULL) {
+                    fprintf(stderr, "getscwd() error in %s.\n", __func__);
+                    exit(EXIT_FAILURE);
+                }
+                else {
+                    printf("cwd: %s\n", buf);
+                    free(buf);
+                }
+            }
+            else {
+                fprintf(stderr, "chdir() error in %s.\n", __func__);
+            }
+            return n;
         }
         else {
-            
+            print_cd_usage();
+            return EXIT_FAILURE;
         }
     }
     return 0;
+}
+
+void
+print_cd_usage() {
+
 }
 
 int32_t _internal_ls() {
