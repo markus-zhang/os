@@ -360,6 +360,7 @@ mash_execute(char** args) {
 
 int 
 builtin(char* program) {
+    // Control characters
     if (strlen(program) == 4 && strncmp(program, "exit", 4) == 0) {
         // just exit
         printf("Built-in command: exit\n");
@@ -392,12 +393,38 @@ builtin(char* program) {
             return EXIT_FAILURE;
         }
     }
-    return 0;
+    else if (strlen(program) == 4 && strncmp(program, "path", 4) == 0) {
+        /**
+         * @brief if no extra arg then display all paths
+         * otherwise add into path
+         * 
+         */
+        int32_t status = 0;
+        if (argsindex == 0) {
+            return inspect_path();
+        }
+        else {
+            for (int i = 1; i <= argsindex; i++) {
+                status = add_path(args[argsindex]);
+                if (status != 0) {
+                    fprintf(stderr, "add_path() failed\n");
+                }
+            }
+            inspect_path();
+        }
+        return status;
+    }
+    return 2;   // Not a builtin
 }
 
 void
 print_cd_usage() {
+    printf("Usage: cd [arg]\n");
+}
 
+void
+print_path_usage() {
+    printf("Usage: path [arg1] [arg2] ...\n");
 }
 
 int32_t _internal_ls() {
