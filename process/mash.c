@@ -349,6 +349,73 @@ mash_execute(char** args) {
     // check if program is a built-in command
     // we have three of them: exit, cd and path
     char* program = args[0];
+    /**
+     * @brief TODO: scan for redirection and parallel commands
+     * The logic should look like this:
+     *
+     *  struct command {
+     *      char* command_execution;
+     *      char** command_args; 
+     *  };
+     *  set stat = ready;
+     *  set command_start = 0;
+     *  set command_end = 0;
+     *  set command_index = 0;
+     *  struct command all_commands[64];
+     *  while (command_start <= argsindex):
+     *      set command_next = malloc(sizeof(struct command));
+     *      set switch_redir = False;
+     *      check args[command_start];
+     *      if (a '>' has been hit):
+     *          if (stat != IN_COMMAND):
+     *              exit ERROR;
+     *          else:
+     *              set command_end = command_end + 1;  // should have another argument after redirection
+     *              if (command_end > argsindex):
+     *                  exit ERROR; // missing argument after redirection
+     *              set char** command_args = malloc(sizeof(char*) * (command_end - command_start));
+     *              for (each char* in args from command_start + 1 to command_end):
+     *                  copy into command_args;
+     *              set char* command_executable = malloc(strlen(args[command_start]) + 1);
+     *              copy args[command_start] which is the name of execution into command_executable;
+     *              
+     *              // Fill the next command and put it into the command array
+     *              set command_next.command_execution = command_execution;
+     *              set command_next.command_args = command_args;
+     *              set all_commands[command_count++] = command_next;
+     *              if (command_index >= 64):
+     *                  return;     // Ignore the rest
+     *
+     *              // Reset command_start and command_end
+     *              command_end++;
+     *              set command_start = command_end;
+     *              set stat = READY;
+     *      else if (a '&' has been hit):
+     *          if (command_end == 0):
+     *              exit ERROR;     // First args cannot be &
+     *          if (stat != READY || stat != IN_COMMAND):
+     *              // READY example: echo "blah" > blah.txt & ls /dev
+     *              //      - stat is READY after parsing '>'
+     *              // IN_COMMAND example: cat blah.txt & ls /dev
+     *              //      - stat is IN_COMMAND when hits '&'
+     *              exit ERROR;     // Is this necessary?
+     *          if (stat == READY):
+     *              set switch_parallel = True;
+     *              increment command_start and command_end to next token;
+     *              set stat = READY;
+     *              otherwise do nothing as the previous command was already inserted
+     *          else if (stat == IN_COMMAND):
+     *              grab the previous command similar to we did for '>'
+     *              set switch_parallel = True;
+     *              increment command_start and command_end to next token;
+     *              set stat = READY;
+     *      else if (an ordinary string has been hit):
+     *          if (stat == READY):
+     *              set stat = IN_COMMAND;
+     *          else if (stat == IN_COMMAND):
+     *              do nothing
+     */
+
     if (builtin(program) == 2) {
         // Not a builtin
         printf("Not a builtin.\n");
@@ -413,6 +480,10 @@ builtin(char* program) {
             inspect_path();
         }
         return status;
+    }
+    else if (strlen(program) == 4 && strncmp(program, "mcat", 4) == 0) {
+        // Added mcat for testing redirection
+
     }
     return 2;   // Not a builtin
 }
