@@ -40,6 +40,11 @@ void print_cd_usage();
 void mash_split_line(char* line);
 int mash_execute(char** args);
 
+struct command {
+    char* command_execution;
+    char** command_args; 
+};
+
 /*!
     Global variables
     - cwd: current working directory
@@ -349,6 +354,22 @@ mash_execute(char** args) {
     // check if program is a built-in command
     // we have three of them: exit, cd and path
     char* program = args[0];
+    enum command_stat {
+        READY = 0,
+        IN_COMMAND
+    };
+    enum command_stat stat = READY;
+    int command_start = 0;
+    int command_end = 0;
+    int command_index = 0;
+    struct command all_commands[64];
+
+    while (command_start <= argsindex) {
+        struct command* command_next = malloc(sizeof(struct command));
+        if (strlen(args[command_start]) == 1 && strncmp(args[command_start], ">", 1) == 0) {
+            
+        }
+    }
     /**
      * @brief TODO: scan for redirection and parallel commands
      * The logic should look like this:
