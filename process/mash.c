@@ -42,7 +42,8 @@ int mash_execute(char** args);
 
 struct command {
     char* command_execution;
-    char** command_args; 
+    char** command_args;
+    int num_args;
 };
 
 /*!
@@ -111,7 +112,7 @@ int main(int argc, char* argv[]) {
          */
 
         mash_split_line(line);
-        print_args();
+        // print_args();
         status = mash_execute(args);
         status = 1;
     }
@@ -366,7 +367,6 @@ mash_execute(char** args) {
     int command_start = 0;
     int command_end = 0;
     int command_index = 0;
-    int command_count = 0;
     switch_parallel = false;
 
     while (command_start <= argsindex) {
@@ -385,10 +385,7 @@ mash_execute(char** args) {
                 char** command_args = malloc(sizeof(char*) * (command_end - command_start));
                 for (int i = command_start + 1; i <= command_end; i++) {
                     char* arg = malloc(strlen(args[i]) + 1);
-                    if (strncpy(arg, args[i], strlen(args[i]) == NULL)) {
-                        fprintf(stderr, "strncpy() error in %s\n", __func__);
-                        return EXIT_FAILURE;
-                    }
+                    strncpy(arg, args[i], strlen(args[i]));
                     arg[-1] = '\0';
                     command_args[i-command_start-1] = arg; 
                 }
@@ -401,9 +398,11 @@ mash_execute(char** args) {
 
                 command_next->command_execution = command_executable;
                 command_next->command_args = command_args;
-                all_commands[command_count] = command_next;
-                command_count++;
-                if (command_count >= 64) {
+                command_next->num_args = command_end - command_start;
+                all_commands[command_index] = command_next;
+                command_index++;
+                
+                if (command_index >= 64) {
                     // Only allocated 64 struct command*
                     break;
                 }
@@ -431,10 +430,7 @@ mash_execute(char** args) {
                 char** command_args = malloc(sizeof(char*) * (command_end - command_start));
                 for (int i = command_start + 1; i <= command_end; i++) {
                     char* arg = malloc(strlen(args[i]) + 1);
-                    if (strncpy(arg, args[i], strlen(args[i]) == NULL)) {
-                        fprintf(stderr, "strncpy() error in %s\n", __func__);
-                        return EXIT_FAILURE;
-                    }
+                    strncpy(arg, args[i], strlen(args[i]));
                     arg[-1] = '\0';
                     command_args[i-command_start-1] = arg; 
                 }
@@ -447,9 +443,10 @@ mash_execute(char** args) {
 
                 command_next->command_execution = command_executable;
                 command_next->command_args = command_args;
-                all_commands[command_count] = command_next;
-                command_count++;
-                if (command_count >= 64) {
+                command_next->num_args = command_end - command_start;
+                all_commands[command_index] = command_next;
+                command_index++;
+                if (command_index >= 64) {
                     // Only allocated 64 struct command*
                     break;
                 }
@@ -470,13 +467,15 @@ mash_execute(char** args) {
             command_end++;
         }
     }
+    printf("Parsing ended\n");
     // Debug: print all args
-    for (int i = 0; i <= command_count; i++) {
+    for (int i = 0; i < command_index; i++) {
         printf("%s: ", all_commands[i]->command_execution);
         char** a = all_commands[i]->command_args;
-        while (a++ != NULL) {
-            printf("%s ", *a);
+        for (int j = 0; j < all_commands[i]->num_args; j++) {
+            printf("%s ", a[j]);
         }
+        printf("\n-----------------------------\n");
     }
     // Force quit
     exit(EXIT_SUCCESS);
