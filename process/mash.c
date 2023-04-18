@@ -369,8 +369,7 @@ mash_execute(char** args) {
     int command_index = 0;
     switch_parallel = false;
 
-    while (command_start <= argsindex) {
-        struct command* command_next = malloc(sizeof(struct command));
+    while (command_end <= argsindex) {
         if (strlen(args[command_end]) == 1 && strncmp(args[command_end], ">", 1) == 0) {
             if (stat != IN_COMMAND) {
                 fprintf(stderr, "Parsing args error: hits > but not parsing commands\n");
@@ -396,6 +395,7 @@ mash_execute(char** args) {
                 }
                 command_executable[-1] = '\0';
 
+                struct command* command_next = malloc(sizeof(struct command));
                 command_next->command_execution = command_executable;
                 command_next->command_args = command_args;
                 command_next->num_args = command_end - command_start;
@@ -441,6 +441,7 @@ mash_execute(char** args) {
                 }
                 command_executable[-1] = '\0';
 
+                struct command* command_next = malloc(sizeof(struct command));
                 command_next->command_execution = command_executable;
                 command_next->command_args = command_args;
                 command_next->num_args = command_end - command_start;
@@ -465,6 +466,37 @@ mash_execute(char** args) {
                 stat = IN_COMMAND;
             }
             command_end++;
+        }
+        /**
+         * @brief IMPORTANT!
+         * If stat == IN_COMMAND but command_end > argsindex
+         * this means we are reaching end of args array
+         * but the last one is not parsed yet so we need to store it again
+         * TODO: It probably make s alot of sense to separate the storage part
+         * into a function
+         */
+        if (stat == IN_COMMAND && command_end > argsindex) {
+            char** command_args = malloc(sizeof(char*) * (command_end - command_start - 1));
+                for (int i = command_start + 1; i <= command_end - 1; i++) {
+                    char* arg = malloc(strlen(args[i]) + 1);
+                    strncpy(arg, args[i], strlen(args[i]));
+                    arg[-1] = '\0';
+                    command_args[i-command_start-1] = arg; 
+                }
+                char* command_executable = malloc(strlen(args[command_start]) + 1);
+                if (strncpy(command_executable, args[command_start], strlen(args[command_start])) == NULL) {
+                    fprintf(stderr, "strncpy() error in %s\n", __func__);
+                    return EXIT_FAILURE;
+                }
+                command_executable[-1] = '\0';
+
+                struct command* command_next = malloc(sizeof(struct command));
+                command_next->command_execution = command_executable;
+                command_next->command_args = command_args;
+                command_next->num_args = command_end - command_start - 1;
+                all_commands[command_index] = command_next;
+                command_index++;    // keep consistency to use i < command_index
+                break;
         }
     }
     printf("Parsing ended\n");
