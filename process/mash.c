@@ -55,13 +55,17 @@ struct command {
         - type: int32_t
         - comment: changes for each remove/add operation
 */
-char*       cwd;
-char**      path;
-int32_t     pathCount;
-char**      args;
-int32_t     argsindex;
-int32_t     status;
-char*       line;
+char*           cwd;
+char**          path;
+int32_t         pathCount;
+char**          args;
+int32_t         argsindex;
+int32_t         status;
+char*           line;
+// eventually all commands get parsed into this array
+struct command* all_commands[64] = {NULL};
+// for &
+bool            switch_parallel = false;
 
 int main(int argc, char* argv[]) {
     // Initiate CWD
@@ -362,14 +366,120 @@ mash_execute(char** args) {
     int command_start = 0;
     int command_end = 0;
     int command_index = 0;
-    struct command all_commands[64];
+    int command_count = 0;
+    switch_parallel = false;
 
     while (command_start <= argsindex) {
         struct command* command_next = malloc(sizeof(struct command));
-        if (strlen(args[command_start]) == 1 && strncmp(args[command_start], ">", 1) == 0) {
-            
+        if (strlen(args[command_end]) == 1 && strncmp(args[command_end], ">", 1) == 0) {
+            if (stat != IN_COMMAND) {
+                fprintf(stderr, "Parsing args error: hits > but not parsing commands\n");
+                return EXIT_FAILURE;
+            }
+            else {
+                command_end ++;
+                if (command_end > argsindex) {
+                    fprintf(stderr, "Parsing args error: no arg after >\n");
+                    return EXIT_FAILURE;
+                }
+                char** command_args = malloc(sizeof(char*) * (command_end - command_start));
+                for (int i = command_start + 1; i <= command_end; i++) {
+                    char* arg = malloc(strlen(args[i]) + 1);
+                    if (strncpy(arg, args[i], strlen(args[i]) == NULL)) {
+                        fprintf(stderr, "strncpy() error in %s\n", __func__);
+                        return EXIT_FAILURE;
+                    }
+                    arg[-1] = '\0';
+                    command_args[i-command_start-1] = arg; 
+                }
+                char* command_executable = malloc(strlen(args[command_start]) + 1);
+                if (strncpy(command_executable, args[command_start], strlen(args[command_start])) == NULL) {
+                    fprintf(stderr, "strncpy() error in %s\n", __func__);
+                    return EXIT_FAILURE;
+                }
+                command_executable[-1] = '\0';
+
+                command_next->command_execution = command_executable;
+                command_next->command_args = command_args;
+                all_commands[command_count] = command_next;
+                command_count++;
+                if (command_count >= 64) {
+                    // Only allocated 64 struct command*
+                    break;
+                }
+                command_end++;
+                command_start = command_end;
+                stat = READY;
+            }
+        }
+        else if (strlen(args[command_end]) == 1 && strncmp(args[command_end], "&", 1) == 0) {
+            if (command_end == 0) {
+                // & cannot be the first arg
+                exit(EXIT_FAILURE);
+            }            
+            if (stat == READY) {
+                // READY example: echo "blah" > blah.txt & ls /dev
+                //      - stat is READY after parsing '>'
+                switch_parallel = true;
+                command_end++;
+                command_start = command_end;
+            }
+            else if (stat == IN_COMMAND) {
+                // IN_COMMAND example: cat blah.txt & ls /dev
+                //      - stat is IN_COMMAND when hits '&'
+                switch_parallel = true;
+                char** command_args = malloc(sizeof(char*) * (command_end - command_start));
+                for (int i = command_start + 1; i <= command_end; i++) {
+                    char* arg = malloc(strlen(args[i]) + 1);
+                    if (strncpy(arg, args[i], strlen(args[i]) == NULL)) {
+                        fprintf(stderr, "strncpy() error in %s\n", __func__);
+                        return EXIT_FAILURE;
+                    }
+                    arg[-1] = '\0';
+                    command_args[i-command_start-1] = arg; 
+                }
+                char* command_executable = malloc(strlen(args[command_start]) + 1);
+                if (strncpy(command_executable, args[command_start], strlen(args[command_start])) == NULL) {
+                    fprintf(stderr, "strncpy() error in %s\n", __func__);
+                    return EXIT_FAILURE;
+                }
+                command_executable[-1] = '\0';
+
+                command_next->command_execution = command_executable;
+                command_next->command_args = command_args;
+                all_commands[command_count] = command_next;
+                command_count++;
+                if (command_count >= 64) {
+                    // Only allocated 64 struct command*
+                    break;
+                }
+                command_end++;
+                command_start = command_end;
+                stat = READY;
+            }
+            else {
+                fprintf(stderr, "& must be in READY or IN_COMMAND stat\n");
+                return EXIT_FAILURE;
+            }
+        }
+        else {
+            // an ordinary string
+            if (stat == READY) {
+                stat = IN_COMMAND;
+            }
+            command_end++;
         }
     }
+    // Debug: print all args
+    for (int i = 0; i <= command_count; i++) {
+        printf("%s: ", all_commands[i]->command_execution);
+        char** a = all_commands[i]->command_args;
+        while (a++ != NULL) {
+            printf("%s ", *a);
+        }
+    }
+    // Force quit
+    exit(EXIT_SUCCESS);
     /**
      * @brief TODO: scan for redirection and parallel commands
      * The logic should look like this:
