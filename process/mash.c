@@ -38,6 +38,8 @@ int builtin(char* program);
 void print_cd_usage();
 
 void mash_split_line(char* line);
+int mash_split_command();
+void make_command(int command_start, int command_end, int* command_index, int lookback);
 int mash_execute(char** args);
 
 struct command {
@@ -61,10 +63,12 @@ char**          path;
 int32_t         pathCount;
 char**          args;
 int32_t         argsindex;
-int32_t         status;
+int32_t         status_split_command;
+int32_t         status_run;
 char*           line;
 // eventually all commands get parsed into this array
 struct command* all_commands[64] = {NULL};
+int32_t         command_index;
 // for &
 bool            switch_parallel = false;
 
@@ -88,9 +92,10 @@ int main(int argc, char* argv[]) {
     // Initiate ARGV
     line = NULL;
     args = malloc(ARGS_INITIAL_SIZE * sizeof(char*));
-    status = 1;
+    status_run = 1;
+    status_split_command = 0;
 
-    while(status) {
+    while(status_run) {
         fprintf(stdout, ">");
         size_t size;
         if (getline(&line, &size, stdin) == -1) {
@@ -113,8 +118,9 @@ int main(int argc, char* argv[]) {
 
         mash_split_line(line);
         // print_args();
-        status = mash_execute(args);
-        status = 1;
+        status_split_command = mash_split_command();
+        // status_run = mash_execute(args);
+        status_run = 0;
     }
 
     // shut down
@@ -126,6 +132,15 @@ int main(int argc, char* argv[]) {
     free(line);
     for (int i = 0; i <= argsindex; i++) {
         free(args[i]);
+    }
+
+    for (int i = 0; i <= command_index - 1; i++) {
+        free(all_commands[i]->command_execution);
+        for (int j = 0; j < all_commands[i]->num_args; j++) {
+            free(all_commands[i]->command_args[j]);
+        }
+        free(all_commands[i]->command_args);
+        free(all_commands[i]);
     }
 
     free(cwd);
@@ -342,23 +357,8 @@ mash_split_line(char* line) {
     printf("argsindex: %d\n", argsindex);
 }
 
-void
-print_args() {
-    for (int i = 0; i <= argsindex; i++) {
-        printf("%s\n", args[i]);
-    }
-}
-
-int
-mash_execute(char** args) {
-    // if args contains zero entries then do nothing
-    if (argsindex < 0) {
-        return 0;
-    }
-
-    // check if program is a built-in command
-    // we have three of them: exit, cd and path
-    char* program = args[0];
+int 
+mash_split_command() {
     enum command_stat {
         READY = 0,
         IN_COMMAND
@@ -366,7 +366,7 @@ mash_execute(char** args) {
     enum command_stat stat = READY;
     int command_start = 0;
     int command_end = 0;
-    int command_index = 0;
+    command_index = 0;
     switch_parallel = false;
 
     while (command_end <= argsindex) {
@@ -381,26 +381,7 @@ mash_execute(char** args) {
                     fprintf(stderr, "Parsing args error: no arg after >\n");
                     return EXIT_FAILURE;
                 }
-                char** command_args = malloc(sizeof(char*) * (command_end - command_start));
-                for (int i = command_start + 1; i <= command_end; i++) {
-                    char* arg = malloc(strlen(args[i]) + 1);
-                    strncpy(arg, args[i], strlen(args[i]));
-                    arg[-1] = '\0';
-                    command_args[i-command_start-1] = arg; 
-                }
-                char* command_executable = malloc(strlen(args[command_start]) + 1);
-                if (strncpy(command_executable, args[command_start], strlen(args[command_start])) == NULL) {
-                    fprintf(stderr, "strncpy() error in %s\n", __func__);
-                    return EXIT_FAILURE;
-                }
-                command_executable[-1] = '\0';
-
-                struct command* command_next = malloc(sizeof(struct command));
-                command_next->command_execution = command_executable;
-                command_next->command_args = command_args;
-                command_next->num_args = command_end - command_start;
-                all_commands[command_index] = command_next;
-                command_index++;
+                make_command(command_start, command_end, &command_index, 0);
                 
                 if (command_index >= 64) {
                     // Only allocated 64 struct command*
@@ -427,26 +408,8 @@ mash_execute(char** args) {
                 // IN_COMMAND example: cat blah.txt & ls /dev
                 //      - stat is IN_COMMAND when hits '&'
                 switch_parallel = true;
-                char** command_args = malloc(sizeof(char*) * (command_end - command_start));
-                for (int i = command_start + 1; i <= command_end; i++) {
-                    char* arg = malloc(strlen(args[i]) + 1);
-                    strncpy(arg, args[i], strlen(args[i]));
-                    arg[-1] = '\0';
-                    command_args[i-command_start-1] = arg; 
-                }
-                char* command_executable = malloc(strlen(args[command_start]) + 1);
-                if (strncpy(command_executable, args[command_start], strlen(args[command_start])) == NULL) {
-                    fprintf(stderr, "strncpy() error in %s\n", __func__);
-                    return EXIT_FAILURE;
-                }
-                command_executable[-1] = '\0';
+                make_command(command_start, command_end, &command_index, 1);
 
-                struct command* command_next = malloc(sizeof(struct command));
-                command_next->command_execution = command_executable;
-                command_next->command_args = command_args;
-                command_next->num_args = command_end - command_start;
-                all_commands[command_index] = command_next;
-                command_index++;
                 if (command_index >= 64) {
                     // Only allocated 64 struct command*
                     break;
@@ -476,27 +439,8 @@ mash_execute(char** args) {
          * into a function
          */
         if (stat == IN_COMMAND && command_end > argsindex) {
-            char** command_args = malloc(sizeof(char*) * (command_end - command_start - 1));
-                for (int i = command_start + 1; i <= command_end - 1; i++) {
-                    char* arg = malloc(strlen(args[i]) + 1);
-                    strncpy(arg, args[i], strlen(args[i]));
-                    arg[-1] = '\0';
-                    command_args[i-command_start-1] = arg; 
-                }
-                char* command_executable = malloc(strlen(args[command_start]) + 1);
-                if (strncpy(command_executable, args[command_start], strlen(args[command_start])) == NULL) {
-                    fprintf(stderr, "strncpy() error in %s\n", __func__);
-                    return EXIT_FAILURE;
-                }
-                command_executable[-1] = '\0';
-
-                struct command* command_next = malloc(sizeof(struct command));
-                command_next->command_execution = command_executable;
-                command_next->command_args = command_args;
-                command_next->num_args = command_end - command_start - 1;
-                all_commands[command_index] = command_next;
-                command_index++;    // keep consistency to use i < command_index
-                break;
+            make_command(command_start, command_end, &command_index, 1);
+            break;
         }
     }
     printf("Parsing ended\n");
@@ -510,7 +454,28 @@ mash_execute(char** args) {
         printf("\n-----------------------------\n");
     }
     // Force quit
-    exit(EXIT_SUCCESS);
+    // exit(EXIT_SUCCESS);
+    return EXIT_SUCCESS;
+}
+
+void
+print_args() {
+    for (int i = 0; i <= argsindex; i++) {
+        printf("%s\n", args[i]);
+    }
+}
+
+int
+mash_execute(char** args) {
+    // if args contains zero entries then do nothing
+    if (argsindex < 0) {
+        return 0;
+    }
+
+    // check if program is a built-in command
+    // we have three of them: exit, cd and path
+    char* program = args[0];
+    
     /**
      * @brief TODO: scan for redirection and parallel commands
      * The logic should look like this:
@@ -585,6 +550,40 @@ mash_execute(char** args) {
     }
 
     return 0;
+}
+
+/**
+ * @brief Seperate the logic of making a command into a function
+ * 
+ * @param command_start: starting index of a command, which is the execution program, arg[0] 
+ * @param command_end: ending index of a command, which is the last arg "token"
+ * @param command_index: the index of the command in all_commands[]
+ * @param lookback: a special switch, 1 for grabbing the last command if it is an "ordinary"
+ *                  command (without > or not prefixed by &), 0 for other cases
+ *                  See make_command() calls for more information
+ */
+void
+make_command(int command_start, int command_end, int* command_index, int lookback) {
+    char** command_args = malloc(sizeof(char*) * (command_end - command_start - lookback));
+    for (int i = command_start + 1; i <= command_end - lookback; i++) {
+        char* arg = malloc(strlen(args[i]) + 1);
+        strncpy(arg, args[i], strlen(args[i]));
+        arg[-1] = '\0';
+        command_args[i-command_start-1] = arg; 
+    }
+    char* command_executable = malloc(strlen(args[command_start]) + 1);
+    if (strncpy(command_executable, args[command_start], strlen(args[command_start])) == NULL) {
+        fprintf(stderr, "strncpy() error in %s\n", __func__);
+        return;
+    }
+    command_executable[-1] = '\0';
+
+    struct command* command_next = malloc(sizeof(struct command));
+    command_next->command_execution = command_executable;
+    command_next->command_args = command_args;
+    command_next->num_args = command_end - command_start - lookback;
+    all_commands[*command_index] = command_next;
+    (*command_index)++;    // keep consistency to use i < command_index
 }
 
 int 
