@@ -12,6 +12,8 @@
 #include <stdint.h>
 // #define _DEFAULT_SOURCE
 #include <dirent.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include "mashtool.h"
 
 /*
@@ -27,6 +29,12 @@
 #define ARGS_INITIAL_SIZE       64
 #define ARGS_INCREMENT_SIZE     16
 
+struct command {
+    char* command_execution;
+    char** command_args;
+    int num_args;
+};
+
 int32_t init_path();
 int32_t inspect_path();
 int32_t add_path(const char* newPath);
@@ -40,13 +48,7 @@ void print_cd_usage();
 void mash_split_line(char* line);
 int mash_split_command();
 void make_command(int command_start, int command_end, int* command_index, int lookback);
-int mash_execute(char** args);
-
-struct command {
-    char* command_execution;
-    char** command_args;
-    int num_args;
-};
+int mash_execute(struct command*[]);
 
 /*!
     Global variables
@@ -119,7 +121,7 @@ int main(int argc, char* argv[]) {
         mash_split_line(line);
         // print_args();
         status_split_command = mash_split_command();
-        // status_run = mash_execute(args);
+        status_run = mash_execute(all_commands);
         status_run = 0;
     }
 
@@ -135,7 +137,7 @@ int main(int argc, char* argv[]) {
     }
 
     for (int i = 0; i <= command_index - 1; i++) {
-        free(all_commands[i]->command_execution);
+        // free(all_commands[i]->command_execution);
         for (int j = 0; j < all_commands[i]->num_args; j++) {
             free(all_commands[i]->command_args[j]);
         }
@@ -357,7 +359,7 @@ mash_split_line(char* line) {
     printf("argsindex: %d\n", argsindex);
 }
 
-int 
+int
 mash_split_command() {
     enum command_stat {
         READY = 0,
@@ -445,6 +447,7 @@ mash_split_command() {
     }
     printf("Parsing ended\n");
     // Debug: print all args
+    
     for (int i = 0; i < command_index; i++) {
         printf("%s: ", all_commands[i]->command_execution);
         char** a = all_commands[i]->command_args;
@@ -453,6 +456,7 @@ mash_split_command() {
         }
         printf("\n-----------------------------\n");
     }
+    
     // Force quit
     // exit(EXIT_SUCCESS);
     return EXIT_SUCCESS;
@@ -466,15 +470,51 @@ print_args() {
 }
 
 int
-mash_execute(char** args) {
-    // if args contains zero entries then do nothing
-    if (argsindex < 0) {
+mash_execute(struct command* all_commands[]) {
+    // command_index should be at least 1 (only 1 command)
+    if (command_index <= 0) {
         return 0;
+    }
+
+    if (switch_parallel) {
+        // TODO: Run all commands parallelly
+    }
+    else {
+        // Then we should only have 1 command
+        // But run them sequentially anyway in case we add that functionality
+        // e.g. maybe dans futur we will add ";", or "&&"
+        // Test with just one command
+        pid_t pid;
+        int status;
+        pid = fork();
+        if (pid == 0) {
+            // Child process
+            if (execvp(all_commands[0]->command_execution, all_commands[0]->command_args) == -1) {
+                perror("mash");
+            }
+            exit(EXIT_FAILURE);
+        }
+        else if (pid < 0) {
+            // Error forking
+            fprintf(stderr, "fork() failed: at line %d in %s\n", __LINE__, __func__);       
+        }
+        else {
+            // Parent process
+            do {
+                waitpid(pid, &status, WUNTRACED);
+            } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+        }
+        return 1;
+        for (int i = 0; i < command_index; i++) {
+            // TODO: Implement this part after the test is done above
+        }
     }
 
     // check if program is a built-in command
     // we have three of them: exit, cd and path
-    char* program = args[0];
+
+    
+    // char* program = args[0];
     
     /**
      * @brief TODO: scan for redirection and parallel commands
@@ -543,11 +583,13 @@ mash_execute(char** args) {
      *              do nothing
      */
 
+    /*
     if (builtin(program) == 2) {
         // Not a builtin
         printf("Not a builtin.\n");
         return 1;
     }
+    */
 
     return 0;
 }
@@ -564,24 +606,35 @@ mash_execute(char** args) {
  */
 void
 make_command(int command_start, int command_end, int* command_index, int lookback) {
-    char** command_args = malloc(sizeof(char*) * (command_end - command_start - lookback));
-    for (int i = command_start + 1; i <= command_end - lookback; i++) {
+    // The +2 at the end is to 
+    // 1) contain a NULL char& for execvp()
+    // 2) contain the executable file name, again for execvp()
+    // See "man execvp" for more information
+    char** command_args = malloc(sizeof(char*) * (command_end - command_start - lookback + 2));
+
+    // loop will fill command_args[0] ~ command_args[the second last]
+    for (int i = command_start; i <= command_end - lookback; i++) {
         char* arg = malloc(strlen(args[i]) + 1);
         strncpy(arg, args[i], strlen(args[i]));
         arg[-1] = '\0';
-        command_args[i-command_start-1] = arg; 
+        // Starting from index 1 and index 0 is left for execution file
+        command_args[i-command_start] = arg; 
     }
+    // Insert a NULL into command_args
+    command_args[command_end - command_start - lookback + 1] = NULL;
     char* command_executable = malloc(strlen(args[command_start]) + 1);
     if (strncpy(command_executable, args[command_start], strlen(args[command_start])) == NULL) {
         fprintf(stderr, "strncpy() error in %s\n", __func__);
         return;
     }
     command_executable[-1] = '\0';
+    // argv[] must have execution file as first element
+    // command_args[0] = command_executable;
 
     struct command* command_next = malloc(sizeof(struct command));
     command_next->command_execution = command_executable;
     command_next->command_args = command_args;
-    command_next->num_args = command_end - command_start - lookback;
+    command_next->num_args = command_end - command_start - lookback + 1;
     all_commands[*command_index] = command_next;
     (*command_index)++;    // keep consistency to use i < command_index
 }
