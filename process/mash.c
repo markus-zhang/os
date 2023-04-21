@@ -476,7 +476,7 @@ mash_execute(struct command* all_commands[]) {
         return 0;
     }
 
-    if (switch_parallel) {
+    if (!switch_parallel) {
         // TODO: Run all commands parallelly
     }
     else {
@@ -486,23 +486,25 @@ mash_execute(struct command* all_commands[]) {
         // Test with just one command
         pid_t pid;
         int status;
-        pid = fork();
-        if (pid == 0) {
-            // Child process
-            if (execvp(all_commands[0]->command_execution, all_commands[0]->command_args) == -1) {
-                perror("mash");
+        for (int i = 0; i < command_index; i++) {
+            pid = fork();
+            if (pid == 0) {
+                // Child process
+                if (execvp(all_commands[i]->command_execution, all_commands[i]->command_args) == -1) {
+                    perror("mash");
+                }
+                exit(EXIT_FAILURE);
             }
-            exit(EXIT_FAILURE);
-        }
-        else if (pid < 0) {
-            // Error forking
-            fprintf(stderr, "fork() failed: at line %d in %s\n", __LINE__, __func__);       
-        }
-        else {
-            // Parent process
-            do {
-                waitpid(pid, &status, WUNTRACED);
-            } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+            else if (pid < 0) {
+                // Error forking
+                fprintf(stderr, "fork() failed: at line %d in %s\n", __LINE__, __func__);       
+            }
+            else {
+                // Parent process
+                do {
+                    waitpid(pid, &status, WUNTRACED);
+                } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+            }
         }
         return 1;
         for (int i = 0; i < command_index; i++) {
