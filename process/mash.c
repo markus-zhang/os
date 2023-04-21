@@ -29,10 +29,17 @@
 #define ARGS_INITIAL_SIZE       64
 #define ARGS_INCREMENT_SIZE     16
 
+/**
+ * @brief functionalities:
+ *  - pipe: 0 indicates receiver, 1 indicates sender, and 2 indicates both
+ *      So for cat ./file.txt | grep master | wc    
+ *      "cat" would have pipe = 1, "grep" has pipe = 2, and "wc" has pipe = 0
+ */
 struct command {
-    char* command_execution;
     char** command_args;
     int num_args;
+    char* redir;
+    int pipe;
 };
 
 int32_t init_path();
@@ -490,8 +497,8 @@ mash_execute(struct command* all_commands[]) {
             pid = fork();
             if (pid == 0) {
                 // Child process
-                if (execvp(all_commands[i]->command_execution, all_commands[i]->command_args) == -1) {
-                    perror("mash");
+                if (execvp(all_commands[i]->command_args[0], all_commands[i]->command_args) == -1) {
+                    fprintf(stderr, "execvp() failed: at line %d in %s\n", __LINE__, __func__);    
                 }
                 exit(EXIT_FAILURE);
             }
@@ -507,9 +514,6 @@ mash_execute(struct command* all_commands[]) {
             }
         }
         return 1;
-        for (int i = 0; i < command_index; i++) {
-            // TODO: Implement this part after the test is done above
-        }
     }
 
     // check if program is a built-in command
@@ -630,8 +634,6 @@ make_command(int command_start, int command_end, int* command_index, int lookbac
         return;
     }
     command_executable[-1] = '\0';
-    // argv[] must have execution file as first element
-    // command_args[0] = command_executable;
 
     struct command* command_next = malloc(sizeof(struct command));
     command_next->command_execution = command_executable;
