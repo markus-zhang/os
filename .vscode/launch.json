@@ -8,7 +8,7 @@
         "name": "(gdb) Launch",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceRoot}/process/mash",
+        "program": "${workspaceRoot}/process/pipe",
         "cwd": "${workspaceRoot}/process",
         // "args": ["/dev"],
         "MIMode": "gdb",
@@ -22,11 +22,25 @@
                 "description": "Set Disassembly Flavor to Intel",
                 "text": "-gdb-set disassembly-flavor intel",
                 "ignoreFailures": true
+            },
+            {
+                // https://sourceware.org/gdb/onlinedocs/gdb/Forks.html
+                "description": "Fork follows Child process",
+                "text": "set follow-fork-mode child",
+                "ignoreFailures": true
+            },
+            {
+                // https://sourceware.org/gdb/onlinedocs/gdb/Forks.html
+                "description": "Fork will keep the other process attached to debugger",
+                "text": "set detach-on-fork off",
+                "ignoreFailures": true
             }
         ],
         // https://hkt999.medium.com/vscode-source-path-%E7%AD%86%E8%A8%98-788df7f04d6
         "sourceFileMap": {
-            "/build/glibc-sMfBJT": "/usr/src/glibc"
+            "/build": "/opt/src/glibc-2.35",
+            "/usr/src/glibc": "/opt/src/glibc-2.35",
+            "/opt/src/glibc-2.35": "/opt/src/glibc-2.35"
         }
     }
     ]
