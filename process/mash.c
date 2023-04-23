@@ -31,15 +31,32 @@
 
 /**
  * @brief functionalities:
- *  - pipe: 0 indicates receiver, 1 indicates sender, and 2 indicates both
+ *  - pipe: 0 indicates no pipe, 1 indicates sender, and 2 indicates both
  *      So for cat ./file.txt | grep master | wc    
  *      "cat" would have pipe = 1, "grep" has pipe = 2, and "wc" has pipe = 0
+ *  - redir: NULL indicates no redirection, otherwise it's the path of the file
+ *      So for echo "dsdsdsd sd" "sdsdsds" > ~/develop/temp/ourput.txt,
+ *      command_args will have 3 elements, num_args = 3,
+ *      redir points to the string "~/develop/temp/output.txt"
  */
 struct command {
     char** command_args;
     int num_args;
     char* redir;
     int pipe;
+};
+
+/**
+ * @brief The enum is for mash_split_command to pass info to make_command()
+ * It indicates whether the current command _TO BE EXTRACTED_ is followed by >, & or |
+ * Or NONE if followed by nothing
+ * 
+ */
+enum cli_special {
+    NONE = 0,
+    REDIR,
+    PARALLEL,
+    PIPE
 };
 
 int32_t init_path();
@@ -54,7 +71,7 @@ void print_cd_usage();
 
 void mash_split_line(char* line);
 int mash_split_command();
-void make_command(int command_start, int command_end, int* command_index, int lookback);
+void make_command(int command_start, int command_end, int* command_index, int lookback, enum cli_special special);
 int mash_execute(struct command*[]);
 
 /*!
@@ -390,7 +407,7 @@ mash_split_command() {
                     fprintf(stderr, "Parsing args error: no arg after >\n");
                     return EXIT_FAILURE;
                 }
-                make_command(command_start, command_end, &command_index, 0);
+                make_command(command_start, command_end, &command_index, 0, REDIR);
                 
                 if (command_index >= 64) {
                     // Only allocated 64 struct command*
@@ -417,7 +434,7 @@ mash_split_command() {
                 // IN_COMMAND example: cat blah.txt & ls /dev
                 //      - stat is IN_COMMAND when hits '&'
                 switch_parallel = true;
-                make_command(command_start, command_end, &command_index, 1);
+                make_command(command_start, command_end, &command_index, 1, PARALLEL);
 
                 if (command_index >= 64) {
                     // Only allocated 64 struct command*
@@ -448,7 +465,7 @@ mash_split_command() {
          * into a function
          */
         if (stat == IN_COMMAND && command_end > argsindex) {
-            make_command(command_start, command_end, &command_index, 1);
+            make_command(command_start, command_end, &command_index, 1, NONE);
             break;
         }
     }
@@ -456,10 +473,13 @@ mash_split_command() {
     // Debug: print all args
     
     for (int i = 0; i < command_index; i++) {
-        printf("%s: ", all_commands[i]->command_execution);
+        printf("%s: ", all_commands[i]->command_args[0]);
         char** a = all_commands[i]->command_args;
         for (int j = 0; j < all_commands[i]->num_args; j++) {
             printf("%s ", a[j]);
+        }
+        if (all_commands[i]->redir != NULL) {
+            printf("\n redir target: %s", all_commands[i]->redir);
         }
         printf("\n-----------------------------\n");
     }
@@ -601,44 +621,56 @@ mash_execute(struct command* all_commands[]) {
 }
 
 /**
- * @brief Seperate the logic of making a command into a function
+ * @brief   Seperate the logic of making a command into a function
  * 
- * @param command_start: starting index of a command, which is the execution program, arg[0] 
- * @param command_end: ending index of a command, which is the last arg "token"
- * @param command_index: the index of the command in all_commands[]
- * @param lookback: a special switch, 1 for grabbing the last command if it is an "ordinary"
+ * @param   command_index: the index of the command in all_commands[]
+ * @param   command_start: starting index of a command, which is the execution program, arg[0] 
+ * @param   command_end: ending index of a command, which is the last arg "token"
+ * @param   lookback: a special switch, 1 for grabbing the last command if it is an "ordinary"
  *                  command (without > or not prefixed by &), 0 for other cases
  *                  See make_command() calls for more information
+ *          struct command {
+ *              char** command_args;
+ *              int num_args;
+ *              char* redir;
+ *              int pipe;
+ *          };
  */
 void
-make_command(int command_start, int command_end, int* command_index, int lookback) {
+make_command(int command_start, int command_end, int* command_index, int lookback, enum cli_special special) {
     // The +2 at the end is to 
     // 1) contain a NULL char& for execvp()
     // 2) contain the executable file name, again for execvp()
     // See "man execvp" for more information
-    char** command_args = malloc(sizeof(char*) * (command_end - command_start - lookback + 2));
+    char* redir = NULL;
+    int pipe = 0;
+    int redir_lookback = 2; // args won't take ">" and "file"
+    if (special != REDIR) {
+        redir_lookback = 0;
+    }
+    int command_args_size = command_end - command_start - lookback - redir_lookback + 2;
+    char** command_args = malloc(sizeof(char*) * command_args_size);
 
-    // loop will fill command_args[0] ~ command_args[the second last]
-    for (int i = command_start; i <= command_end - lookback; i++) {
+    // loop will fill command_args[0] ~ command_args[the second last]    
+    for (int i = command_start; i <= command_start + command_args_size - 2; i++) {
         char* arg = malloc(strlen(args[i]) + 1);
         strncpy(arg, args[i], strlen(args[i]));
         arg[-1] = '\0';
-        // Starting from index 1 and index 0 is left for execution file
         command_args[i-command_start] = arg; 
     }
-    // Insert a NULL into command_args
-    command_args[command_end - command_start - lookback + 1] = NULL;
-    char* command_executable = malloc(strlen(args[command_start]) + 1);
-    if (strncpy(command_executable, args[command_start], strlen(args[command_start])) == NULL) {
-        fprintf(stderr, "strncpy() error in %s\n", __func__);
-        return;
+    // Insert a NULL into command_args at the end
+    command_args[command_args_size - 1] = NULL;
+    if (redir_lookback > 0) {
+        redir = malloc(strlen(args[command_end]) + 1);
+        strncpy(redir, args[command_end], strlen(args[command_end]));
+        redir[-1] = '\0';
     }
-    command_executable[-1] = '\0';
 
     struct command* command_next = malloc(sizeof(struct command));
-    command_next->command_execution = command_executable;
     command_next->command_args = command_args;
-    command_next->num_args = command_end - command_start - lookback + 1;
+    command_next->num_args = command_args_size - 1;
+    command_next->redir = redir;
+    command_next->pipe = pipe;
     all_commands[*command_index] = command_next;
     (*command_index)++;    // keep consistency to use i < command_index
 }

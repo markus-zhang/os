@@ -57,9 +57,7 @@ int main() {
 
         // Close the write end, as we don't need it in this process
         close(pipefd[1]);
-        
-        
-        
+               
         // Execute "grep password"
         execlp("grep", "grep", "cat", (char *)NULL);
         perror("execlp");
@@ -80,9 +78,9 @@ int main() {
         // Close the write end, as we don't need it in this process
         close(pipefd_next[1]);
         // commenting the follow line is fine
-        // close(pipefd[0]);
+        close(pipefd[0]);
         // commenting the next line is NOT fine
-        // close(pipefd[1]);
+        close(pipefd[1]);
 
         // Execute "grep password"
         execlp("wc", "wc", (char *)NULL);
