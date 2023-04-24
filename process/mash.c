@@ -3,100 +3,7 @@
     gcc -std=gnu99 -Wall -Werror -pedantic mash.c -o mash
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#define __STDC_WANT_LIB_EXT1__ 1
-#include <string.h>
-#include <stdbool.h>
-#include <stdint.h>
-// #define _DEFAULT_SOURCE
-#include <dirent.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include "mashtool.h"
-
-/*
-    TODO: Summarize the functionalities of MASH
-*/
-
-#define DEBUG                   true
-#define RUNNING                 true
-// Allow 64 strings in path initially, add 16 each time if needed
-#define PATH_INITIAL_SIZE       64
-#define PATH_INCREMENT_SIZE     16
-#define CWD_LEN                 256
-#define ARGS_INITIAL_SIZE       64
-#define ARGS_INCREMENT_SIZE     16
-
-/**
- * @brief functionalities:
- *  - pipe: 0 indicates no pipe, 1 indicates sender, and 2 indicates both
- *      So for cat ./file.txt | grep master | wc    
- *      "cat" would have pipe = 1, "grep" has pipe = 2, and "wc" has pipe = 0
- *  - redir: NULL indicates no redirection, otherwise it's the path of the file
- *      So for echo "dsdsdsd sd" "sdsdsds" > ~/develop/temp/ourput.txt,
- *      command_args will have 3 elements, num_args = 3,
- *      redir points to the string "~/develop/temp/output.txt"
- */
-struct command {
-    char** command_args;
-    int num_args;
-    char* redir;
-    int pipe;
-};
-
-/**
- * @brief The enum is for mash_split_command to pass info to make_command()
- * It indicates whether the current command _TO BE EXTRACTED_ is followed by >, & or |
- * Or NONE if followed by nothing
- * 
- */
-enum cli_special {
-    NONE = 0,
-    REDIR,
-    PARALLEL,
-    PIPE
-};
-
-int32_t init_path();
-int32_t inspect_path();
-int32_t add_path(const char* newPath);
-int32_t remove_path(const char* oldPath);
-int32_t process_command(char* command);
-int32_t _internal_ls();
-void print_args();
-int builtin(char* program);
-void print_cd_usage();
-
-void mash_split_line(char* line);
-int mash_split_command();
-void make_command(int command_start, int command_end, int* command_index, int lookback, enum cli_special special);
-int mash_execute(struct command*[]);
-
-/*!
-    Global variables
-    - cwd: current working directory
-        - type: C string
-    - path: collection of all directories in $PATH
-        - type: array of C strings
-    - pathCount: count of paths in $PATH
-        - type: int32_t
-        - comment: changes for each remove/add operation
-*/
-char*           cwd;
-char**          path;
-int32_t         pathCount;
-char**          args;
-int32_t         argsindex;
-int32_t         status_split_command;
-int32_t         status_run;
-char*           line;
-// eventually all commands get parsed into this array
-struct command* all_commands[64] = {NULL};
-int32_t         command_index;
-// for &
-bool            switch_parallel = false;
+#include "mash.h"
 
 int main(int argc, char* argv[]) {
     // Initiate CWD
@@ -319,61 +226,73 @@ int32_t process_command(char* command) {
  */
 void
 mash_split_line(char* line) {
-    argsindex = -1;
-    // char** argswalker = args;
-    int len = strlen(line);
     enum parsestat {
         ready = 0,
         token_begin,
         in_string
     };
 
+    argsindex = -1;
+    int len = strlen(line);
     enum parsestat stat = ready;
-    int tokenstart = 0;
-    int tokenend = 0;
+    int token_start = 0;
+    int token_end = 0;
 
     // loop stops at [len-2] to get rid of linebreak
     for (int i = 0; i <= len - 1; i++) {
-        if (line[i] != ' ' && line[i] != '"' && i < len - 1) {
+        char current_char = line[i];
+        char next_char = line[i + 1];
+
+        // Starting a new token
+        if (current_char != ' ' && current_char != '"' && current_char != '\0' && current_char != '\n') {
             if (stat == ready) {
                 stat = token_begin;
-                tokenstart = i;
+                token_start = i;
             }
         }
-        else if (line[i] == ' ' || i == len - 1) {
+        // Ending a token NOT encapsulated by quotation marks
+        else if (line[i] == ' ' || current_char == '\0' || current_char == '\n') {
             // If ready, do nothing; If already parsing, set tokenend (if in string then stat is in_string)
             // If in string, do nothing; if is_escaped, do nothing
             if (stat == token_begin) {
-                tokenend = i - 1;
-                char* token = malloc(tokenend - tokenstart + 2);
-                for (int j = tokenstart; j <= tokenend; j++) {
-                    token[j - tokenstart] = line[j];
+                token_end = i - 1;
+                int token_len = token_end - token_start + 1;
+                char* token = malloc(token_len + 1);
+                if (token == NULL) {
+                    perror("malloc");
+                    return;
                 }
-                token[tokenend - tokenstart + 1] = '\0';
+                strncpy(token, line + token_start, token_len);
+                token[token_len] = '\0';
+
                 argsindex++;
                 args[argsindex] = token;
                 stat = ready;
             }
         }
-        else if (line[i] == '"') {
+        // Handling double quotes
+        else if (current_char == '"') {
             if (stat == ready) {
-                if (line[i+1] != '\0') {
-                    tokenstart = i + 1;
+                if (next_char != '\0') {
+                    token_start = i + 1;
                     stat = in_string;
                 }
                 else {
                     fprintf(stderr, "Wrong parsing status at index %d: %c\n", i, line[i]);
-                    exit(EXIT_FAILURE);
+                    return;
                 }
             }
             else if (stat == in_string) {
                 // OK we are out
-                tokenend = i - 1;
-                char* token = malloc(tokenend - tokenstart + 2);
-                for (int j = tokenstart; j <= tokenend; j++) {
-                    token[j - tokenstart] = line[j];
+                token_end = i - 1;
+                int token_len = token_end - token_start + 1;
+                char* token = malloc(token_len + 1);
+                if (token == NULL) {
+                    perror("malloc");
+                    return;
                 }
-                token[tokenend - tokenstart + 1] = '\0';
+                strncpy(token, line + token_start, token_len);
+                token[token_len] = '\0';
                 argsindex++;
                 args[argsindex] = token;
                 stat = ready;
@@ -541,82 +460,6 @@ mash_execute(struct command* all_commands[]) {
 
     
     // char* program = args[0];
-    
-    /**
-     * @brief TODO: scan for redirection and parallel commands
-     * The logic should look like this:
-     *
-     *  struct command {
-     *      char* command_execution;
-     *      char** command_args; 
-     *  };
-     *  set stat = ready;
-     *  set command_start = 0;
-     *  set command_end = 0;
-     *  set command_index = 0;
-     *  struct command all_commands[64];
-     *  while (command_start <= argsindex):
-     *      set command_next = malloc(sizeof(struct command));
-     *      set switch_redir = False;
-     *      check args[command_start];
-     *      if (a '>' has been hit):
-     *          if (stat != IN_COMMAND):
-     *              exit ERROR;
-     *          else:
-     *              set command_end = command_end + 1;  // should have another argument after redirection
-     *              if (command_end > argsindex):
-     *                  exit ERROR; // missing argument after redirection
-     *              set char** command_args = malloc(sizeof(char*) * (command_end - command_start));
-     *              for (each char* in args from command_start + 1 to command_end):
-     *                  copy into command_args;
-     *              set char* command_executable = malloc(strlen(args[command_start]) + 1);
-     *              copy args[command_start] which is the name of execution into command_executable;
-     *              
-     *              // Fill the next command and put it into the command array
-     *              set command_next.command_execution = command_execution;
-     *              set command_next.command_args = command_args;
-     *              set all_commands[command_count++] = command_next;
-     *              if (command_index >= 64):
-     *                  return;     // Ignore the rest
-     *
-     *              // Reset command_start and command_end
-     *              command_end++;
-     *              set command_start = command_end;
-     *              set stat = READY;
-     *      else if (a '&' has been hit):
-     *          if (command_end == 0):
-     *              exit ERROR;     // First args cannot be &
-     *          if (stat != READY || stat != IN_COMMAND):
-     *              // READY example: echo "blah" > blah.txt & ls /dev
-     *              //      - stat is READY after parsing '>'
-     *              // IN_COMMAND example: cat blah.txt & ls /dev
-     *              //      - stat is IN_COMMAND when hits '&'
-     *              exit ERROR;     // Is this necessary?
-     *          if (stat == READY):
-     *              set switch_parallel = True;
-     *              increment command_start and command_end to next token;
-     *              set stat = READY;
-     *              otherwise do nothing as the previous command was already inserted
-     *          else if (stat == IN_COMMAND):
-     *              grab the previous command similar to we did for '>'
-     *              set switch_parallel = True;
-     *              increment command_start and command_end to next token;
-     *              set stat = READY;
-     *      else if (an ordinary string has been hit):
-     *          if (stat == READY):
-     *              set stat = IN_COMMAND;
-     *          else if (stat == IN_COMMAND):
-     *              do nothing
-     */
-
-    /*
-    if (builtin(program) == 2) {
-        // Not a builtin
-        printf("Not a builtin.\n");
-        return 1;
-    }
-    */
-
     return 0;
 }
 
