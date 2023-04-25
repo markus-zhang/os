@@ -391,17 +391,17 @@ mash_split_command() {
     printf("Parsing ended\n");
     // Debug: print all args
     
-    for (int i = 0; i < command_index; i++) {
-        printf("%s: ", all_commands[i]->command_args[0]);
-        char** a = all_commands[i]->command_args;
-        for (int j = 0; j < all_commands[i]->num_args; j++) {
-            printf("%s ", a[j]);
-        }
-        if (all_commands[i]->redir != NULL) {
-            printf("\n redir target: %s", all_commands[i]->redir);
-        }
-        printf("\n-----------------------------\n");
-    }
+    // for (int i = 0; i < command_index; i++) {
+    //     printf("%s: ", all_commands[i]->command_args[0]);
+    //     char** a = all_commands[i]->command_args;
+    //     for (int j = 0; j < all_commands[i]->num_args; j++) {
+    //         printf("%s ", a[j]);
+    //     }
+    //     if (all_commands[i]->redir != NULL) {
+    //         printf("\n redir target: %s", all_commands[i]->redir);
+    //     }
+    //     printf("\n-----------------------------\n");
+    // }
     
     // Force quit
     // exit(EXIT_SUCCESS);
