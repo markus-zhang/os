@@ -422,7 +422,7 @@ mash_execute(struct command* all_commands[]) {
         return 0;
     }
 
-    if (!switch_parallel) {
+    if (switch_parallel) {
         // TODO: Run all commands parallelly
     }
     else {
@@ -436,8 +436,23 @@ mash_execute(struct command* all_commands[]) {
             pid = fork();
             if (pid == 0) {
                 // Child process
-                if (execvp(all_commands[i]->command_args[0], all_commands[i]->command_args) == -1) {
-                    fprintf(stderr, "execvp() failed: at line %d in %s\n", __LINE__, __func__);    
+                // Deal with redirection
+                struct command* current_command = all_commands[i];
+                char* redir = current_command->redir;
+                if (redir != NULL) {
+                    // need to redirect output to file
+                    printf("Ready to redir to: %s\n", redir);
+                    int fd1 = creat(redir, 0644);
+                    if (fd1 < 0) {
+                        fprintf(stderr, "creat() error: at line %d in %s\n", __LINE__, __func__);
+                        exit(EXIT_FAILURE);
+                    }
+                    dup2(fd1, STDOUT_FILENO);
+                    close(fd1);
+                }
+                if (execvp(current_command->command_args[0], current_command->command_args) == -1) {
+                    fprintf(stderr, "execvp() failed: at line %d in %s\n", __LINE__, __func__);
+                    exit(EXIT_FAILURE);
                 }
                 exit(EXIT_FAILURE);
             }
