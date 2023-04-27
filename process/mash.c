@@ -52,6 +52,7 @@ int main(int argc, char* argv[]) {
         mash_split_line(line);
         // print_args();
         status_split_command = mash_split_command();
+        exit(0);
         status_run = mash_execute(all_commands);
         status_run = 0;
     }
@@ -353,6 +354,7 @@ mash_split_command() {
                 // IN_COMMAND example: cat blah.txt & ls /dev
                 //      - stat is IN_COMMAND when hits '&'
                 switch_parallel = true;
+                switch_pipe = false;
                 make_command(command_start, command_end, &command_index, 1, PARALLEL);
 
                 if (command_index >= 64) {
@@ -366,6 +368,38 @@ mash_split_command() {
             else {
                 fprintf(stderr, "& must be in READY or IN_COMMAND stat\n");
                 return EXIT_FAILURE;
+            }
+        }
+        else if (strlen(args[command_end]) == 1 && strncmp(args[command_end], "|", 1) == 0) {
+            if (command_end == 0) {
+                // | cannot be the first arg
+                fprintf(stderr, "| cannot be the first command\n");
+                exit(EXIT_FAILURE);
+            }
+            if (stat == READY) {
+                // READY example: echo "sdsd" > blah.txt | sort
+                //      - stat is READY after parsing '|'
+                //      - this is wrong as > cannot be followed by a |
+                fprintf(stderr, "| cannot follow >\n");
+                exit(EXIT_FAILURE);
+            }
+            else if (stat == IN_COMMAND) {
+                // IN_COMMAND example: cat blah.txt | sort
+                //      - stat is IN_COMMAND when hits '|'
+                //      - this is legal
+                //      We should just use one pipe flag and let execute() to
+                //      figure out the direction of pipes
+                
+                switch_pipe = true;
+                make_command(command_start, command_end, &command_index, 1, PIPE);
+
+                if (command_index >= 64) {
+                    // Only allocated 64 struct command*
+                    break;
+                }
+                command_end++;
+                command_start = command_end;
+                stat = READY;
             }
         }
         else {
@@ -391,17 +425,17 @@ mash_split_command() {
     printf("Parsing ended\n");
     // Debug: print all args
     
-    // for (int i = 0; i < command_index; i++) {
-    //     printf("%s: ", all_commands[i]->command_args[0]);
-    //     char** a = all_commands[i]->command_args;
-    //     for (int j = 0; j < all_commands[i]->num_args; j++) {
-    //         printf("%s ", a[j]);
-    //     }
-    //     if (all_commands[i]->redir != NULL) {
-    //         printf("\n redir target: %s", all_commands[i]->redir);
-    //     }
-    //     printf("\n-----------------------------\n");
-    // }
+    for (int i = 0; i < command_index; i++) {
+        printf("%s: ", all_commands[i]->command_args[0]);
+        char** a = all_commands[i]->command_args;
+        for (int j = 0; j < all_commands[i]->num_args; j++) {
+            printf("%s ", a[j]);
+        }
+        if (all_commands[i]->redir != NULL) {
+            printf("\n redir target: %s", all_commands[i]->redir);
+        }
+        printf("\n-----------------------------\n");
+    }
     
     // Force quit
     // exit(EXIT_SUCCESS);
@@ -502,6 +536,9 @@ make_command(int command_start, int command_end, int* command_index, int lookbac
     // See "man execvp" for more information
     char* redir = NULL;
     int pipe = 0;
+    if (switch_pipe) {
+        pipe = 1;
+    }
     int redir_lookback = 2; // args won't take ">" and "file"
     if (special != REDIR) {
         redir_lookback = 0;

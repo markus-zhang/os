@@ -88,6 +88,8 @@ struct command* all_commands[64] = {NULL};
 int32_t         command_index;
 // for &
 bool            switch_parallel = false;
+// for |
+bool            switch_pipe = false;
 
 
 int32_t init_path();
