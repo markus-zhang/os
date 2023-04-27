@@ -51,8 +51,9 @@ int main(int argc, char* argv[]) {
 
         mash_split_line(line);
         // print_args();
+        // exit(0);
         status_split_command = mash_split_command();
-        exit(0);
+        // exit(0);
         status_run = mash_execute(all_commands);
         status_run = 0;
     }
@@ -252,7 +253,7 @@ mash_split_line(char* line) {
             }
         }
         // Ending a token NOT encapsulated by quotation marks
-        else if (line[i] == ' ' || current_char == '\0' || current_char == '\n') {
+        else if (current_char == ' ' || current_char == '\0' || current_char == '\n') {
             // If ready, do nothing; If already parsing, set tokenend (if in string then stat is in_string)
             // If in string, do nothing; if is_escaped, do nothing
             if (stat == token_begin) {
@@ -305,6 +306,11 @@ mash_split_line(char* line) {
 
 int
 mash_split_command() {
+    /**
+     * @brief We need a new algorithm to allow commands such like:
+     * cmdA1 | cmdA2 ... | cmdAn & cmdB1 | ... | cmdBm
+     * 
+     */
     enum command_stat {
         READY = 0,
         IN_COMMAND
@@ -458,6 +464,44 @@ mash_execute(struct command* all_commands[]) {
 
     if (switch_parallel) {
         // TODO: Run all commands parallelly
+        printf("Parallel execution\n");
+        pid_t pid;
+        int status;
+        for (int i = 0; i < command_index; i++) {
+            pid = fork();
+            if (pid == 0) {
+                // Child process
+                // Deal with redirection
+                struct command* current_command = all_commands[i];
+                char* redir = current_command->redir;
+                if (redir != NULL) {
+                    // need to redirect output to file
+                    printf("Ready to redir to: %s\n", redir);
+                    int fd1 = creat(redir, 0644);
+                    if (fd1 < 0) {
+                        fprintf(stderr, "creat() error: at line %d in %s\n", __LINE__, __func__);
+                        exit(EXIT_FAILURE);
+                    }
+                    dup2(fd1, STDOUT_FILENO);
+                    close(fd1);
+                }
+                if (execvp(current_command->command_args[0], current_command->command_args) == -1) {
+                    fprintf(stderr, "execvp() failed: at line %d in %s\n", __LINE__, __func__);
+                    exit(EXIT_FAILURE);
+                }
+                exit(EXIT_FAILURE);
+            }
+            else if (pid < 0) {
+                // Error forking
+                fprintf(stderr, "fork() failed: at line %d in %s\n", __LINE__, __func__);       
+            }
+            else {
+                // Parent process, do nothing for parallel runs
+            }
+        }
+        // TODO: need to wait each pid here
+        waitpid(pid, &status, WUNTRACED);
+        return 0;
     }
     else {
         // Then we should only have 1 command
