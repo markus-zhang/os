@@ -8,8 +8,8 @@
         "name": "(gdb) Launch",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceRoot}/process/mash",
-        "cwd": "${workspaceRoot}/process",
+        "program": "${workspaceRoot}/fs/mpwd",
+        "cwd": "${workspaceRoot}/fs",
         // "args": ["/dev"],
         "MIMode": "gdb",
         "setupCommands": [
