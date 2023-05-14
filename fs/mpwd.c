@@ -44,6 +44,10 @@ void run(ino_t current_dir_inode) {
          * because we want to display in backward order
          * 
          */
+
+        // If you wonder why chdir() does not seem to change the cwd
+        // when the program ends and control returns to shell,
+        // recall that each process has its own cwd
         chdir("..");
         char current_dir[1024];
         inode_to_name(current_dir_inode, current_dir, 1024);
