@@ -8,9 +8,9 @@
         "name": "(gdb) Launch",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceRoot}/fs/mpwd",
+        "program": "${workspaceRoot}/fs/mfind",
         "cwd": "${workspaceRoot}/fs",
-        // "args": ["/dev"],
+        "args": ["fs.md"],
         "MIMode": "gdb",
         "setupCommands": [
             {
