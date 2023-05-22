@@ -4,5 +4,10 @@
         "stdlib.h": "c",
         "types.h": "c",
         "type_traits": "c"
+    },
+    "files.exclude": {
+        "**/.gitignore": false,
+        "**/.git": true,
+        "**/.vscode": false
     }
 }
