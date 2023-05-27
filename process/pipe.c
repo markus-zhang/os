@@ -33,6 +33,7 @@ int main() {
 
         // Close the read end, as we don't need it in this process
         close(pipefd[0]);
+        close(pipefd[1]);
         close(pipefd_next[0]);
         close(pipefd_next[1]);
 
@@ -57,6 +58,7 @@ int main() {
 
         // Close the write end, as we don't need it in this process
         close(pipefd[1]);
+        close(pipefd[0]);
                
         // Execute "grep password"
         execlp("grep", "grep", "cat", (char *)NULL);
